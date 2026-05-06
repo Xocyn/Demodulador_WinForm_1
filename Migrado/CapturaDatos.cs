@@ -68,6 +68,18 @@ namespace Demodulador_WinForm_1
             }
         }
 
+        private void ClearMAIN()
+        {
+            if (_form?.InvokeRequired == true)
+            {
+                _form.Invoke(() => _form.MAINDISPLAY.Clear());
+            }
+            else
+            {
+                _form?.MAINDISPLAY.Clear();
+            }
+        }
+
         public void IniciarCaptura()
         {
             if (_isRunning)
@@ -266,15 +278,7 @@ namespace Demodulador_WinForm_1
 
                 void IniciarGrabacion(int ph)
                 {
-                    if (_form?.InvokeRequired == true)
-                    {
-                        _form.Invoke(() => _form.MAINDISPLAY.Clear());
-                    }
-                    else
-                    {
-                        _form?.MAINDISPLAY.Clear();
-                    }
-
+                    ClearMAIN();
                     lockedPhase = ph;
                     _demod.LockPhase(ph);
                     inicioGrabacion = DateTime.Now;

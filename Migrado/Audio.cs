@@ -7,8 +7,8 @@ public class BFSKDemodulator
 {
     const int SampleRate = 44100;
 
-    private readonly double _freqBit0;
-    private readonly double _freqBit1;
+    private double _freqBit0;
+    private double _freqBit1;
     private readonly double _samplesPerSymbol;
     private readonly double _energyThreshold;
 
