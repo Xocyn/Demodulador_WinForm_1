@@ -30,6 +30,7 @@ namespace Demodulador_WinForm_1
         private void combox_hf_vhf_SelectedIndexChanged(object sender, EventArgs e)
         {
             MAINDISPLAY.Clear();
+            combox_hf_vhf.Enabled = false;
             string banda = combox_hf_vhf.SelectedIndex == 1 ? "VHF" : "MF/HF";
             DISPLAYSECUNDARIO.AppendText($"Banda seleccionada: {banda}\n");
 
@@ -53,9 +54,5 @@ namespace Demodulador_WinForm_1
             }
         }
 
-        private void waveViewer1_Load(object sender, EventArgs e)
-        {
-
-        }
     }
 }

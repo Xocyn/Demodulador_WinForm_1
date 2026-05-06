@@ -35,7 +35,7 @@
             splitContainer1 = new SplitContainer();
             DISPLAYSECUNDARIO = new RichTextBox();
             MAINDISPLAY = new RichTextBox();
-            waveViewer1 = new NAudio.Gui.WaveViewer();
+            waveViewer1 = new WaveViewerControl();
             ((System.ComponentModel.ISupportInitialize)splitContainer1).BeginInit();
             splitContainer1.Panel1.SuspendLayout();
             splitContainer1.Panel2.SuspendLayout();
@@ -113,14 +113,14 @@
             // 
             // waveViewer1
             // 
+            waveViewer1.BackColor = Color.Black;
+            waveViewer1.ForeColor = Color.Lime;
             waveViewer1.Location = new Point(454, 6);
+            waveViewer1.Margin = new Padding(0);
             waveViewer1.Name = "waveViewer1";
-            waveViewer1.SamplesPerPixel = 128;
             waveViewer1.Size = new Size(463, 100);
-            waveViewer1.StartPosition = 0L;
             waveViewer1.TabIndex = 5;
-            waveViewer1.WaveStream = null;
-            waveViewer1.Load += waveViewer1_Load;
+
             // 
             // Demodulador_DSC
             // 
@@ -152,6 +152,6 @@
         private SplitContainer splitContainer1;
         public RichTextBox DISPLAYSECUNDARIO;
         public RichTextBox MAINDISPLAY;
-        private NAudio.Gui.WaveViewer waveViewer1;
+        public WaveViewerControl waveViewer1;
     }
 }

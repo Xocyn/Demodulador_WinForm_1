@@ -28,7 +28,8 @@ namespace Demodulador_WinForm_1
         private readonly ConcurrentQueue<string> _mensajesCapturados = new();
 
         // CancellationToken para detener el thread de procesamiento limpiamente al salir.
-        private readonly CancellationTokenSource _cts = new();
+        // ⚠️ NOTA: Se crea de nuevo cada vez que se inicia captura, NO es readonly
+        private CancellationTokenSource _cts;
 
         // Lock para proteger las variables de estado compartidas entre el thread de audio
         // y el thread principal (cambio de modo con M).
@@ -38,6 +39,7 @@ namespace Demodulador_WinForm_1
         private BFSKDemodulator _demod;
         private Thread _processingThread;
         private bool _isRunning = false;
+        private WaveDisplayManager _waveDisplayManager;
 
         public CapturaDatos(Demodulador_DSC form)
         {
@@ -80,6 +82,11 @@ namespace Demodulador_WinForm_1
             }
         }
 
+        private void UpdateWaveDisplay(short[] samples)
+        {
+            _waveDisplayManager?.AddSamples(samples);
+        }
+
         public void IniciarCaptura()
         {
             if (_isRunning)
@@ -89,6 +96,11 @@ namespace Demodulador_WinForm_1
             }
 
             _isRunning = true;
+
+            // ⚠️ IMPORTANTE: Crear un NUEVO CancellationTokenSource para cada captura
+            // El anterior fue cancelado y no se puede reutilizar
+            _cts = new CancellationTokenSource();
+
             bool vhfMode = _form.combox_hf_vhf.SelectedIndex == 1;
 
             _waveIn = new WaveInEvent();
@@ -99,6 +111,24 @@ namespace Demodulador_WinForm_1
 
             // Instanciar Procesamiento con referencias a los controles del formulario
             var procesamiento = new Procesamiento(_form.MAINDISPLAY);
+
+            // ── Inicializar visualización de onda ────────────────────────────────────
+            // Crear callback que actualice el waveViewer1 de forma thread-safe
+            _waveDisplayManager = new WaveDisplayManager(
+                updateDisplay: (samples) =>
+                {
+                    if (_form?.InvokeRequired == true)
+                    {
+                        _form.Invoke(() => _form.waveViewer1.AddSamples(samples));
+                    }
+                    else
+                    {
+                        _form?.waveViewer1.AddSamples(samples);
+                    }
+                },
+                targetSamples: 4096,      // Mostrar 4096 muestras
+                updateIntervalMs: 50      // Actualizar cada 50ms (~20 FPS)
+            );
 
             const int PhaseCount = 4;
             var syncBuffers = new StringBuilder[PhaseCount];
@@ -154,6 +184,16 @@ namespace Demodulador_WinForm_1
             // ── Callback de audio ────────────────────────────────────────────────────
             _waveIn.DataAvailable += (s, a) =>
             {
+                // ── Capturar muestras para visualización ──────────────────────────────
+                // Convertir bytes a shorts para el waveViewer
+                if (a.BytesRecorded > 0)
+                {
+                    int sampleCount = a.BytesRecorded / 2;
+                    short[] samples = new short[sampleCount];
+                    Buffer.BlockCopy(a.Buffer, 0, samples, 0, a.BytesRecorded);
+                    UpdateWaveDisplay(samples);
+                }
+
                 string[] bitsByPhase;
                 lock (_lock)
                 {
@@ -331,9 +371,21 @@ namespace Demodulador_WinForm_1
 
             _isRunning = false;
             _waveIn?.StopRecording();
-            _cts.Cancel();
+
+            // Cancelar el token de cancelación
+            _cts?.Cancel();
+
+            // Esperar a que el thread de procesamiento termine
             _processingThread?.Join(2000);
+
+            // Limpiar recursos
             _waveIn?.Dispose();
+            _cts?.Dispose();  // ⚠️ Importante: Dispose para liberar recursos
+            _cts = null;      // Preparar para la próxima captura
+
+            // Limpiar visualización de onda
+            _waveDisplayManager?.Clear();
+            _waveDisplayManager = null;
         }
 
         public void CambiarModo()
