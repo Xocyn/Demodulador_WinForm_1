@@ -45,6 +45,7 @@ namespace Demodulador_WinForm_1
         {
             string dispositivo = combox_dispositivos.SelectedItem?.ToString() ?? "Desconocido";
             DISPLAYSECUNDARIO.AppendText($"Dispositivo seleccionado: {dispositivo}\n");
+            combox_dispositivos.Enabled = false;
 
             if (!_isCapturing && combox_hf_vhf.SelectedIndex >= 0)
             {

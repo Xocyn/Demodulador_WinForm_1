@@ -1,5 +1,6 @@
 using MathNet.Numerics;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Windows.Forms;
 
@@ -139,14 +140,34 @@ namespace Dem_v2
                 List<int> ECC = MESSAGE.ToList();
                 List<int> datos_respuesta = new List<int>();
 
-                string mensaje_string = string.Join(" ", MENSAJE.Select(x => x.ToString("D2")));
-                LogToDisplay($"MENSAJE: {mensaje_string}\n");
+                // ── Fase 4: Extension?  -────────-──────────────────────────────────
 
+                if (Extension(MENSAJE))
+                {
+                    int firstindex127 = MENSAJE.IndexOf(127); int firstindex117 = MENSAJE.IndexOf(117); int firstindex122 = MENSAJE.IndexOf(122);
+                    List<int> MENSAJE_OG = MENSAJE.GetRange(0, firstindex127 + 8);
+                    List<int> MENSAJE_EXT = MENSAJE.GetRange(firstindex127 + 8, MENSAJE.Count - (firstindex127 + 8));
+                    string m1 = string.Join(" ", MENSAJE_OG.Select(x => x.ToString("D2")));
+                    string m2= string.Join(" ", MENSAJE_EXT.Select(x => x.ToString("D2")));
+                    LogToDisplay($"MENSAJE: {m1}\n");
+                    LogToDisplay($"MENSAJE DE EXTENSION: {m2}\n");
+
+                }
+                else
+                {
+                    Geografica.EliminarPosicionesImpares(ECC); // Obtengo los DX
+                    ECC = PrepararECC(ECC);
+
+                    string mensaje_string = string.Join(" ", MENSAJE.Select(x => x.ToString("D2")));
+                    LogToDisplay($"MENSAJE: {mensaje_string}\n");
+                }
+                /*
                 Geografica.EliminarPosicionesImpares(ECC); // Obtengo los DX
 
                 ECC = PrepararECC(ECC);
+                */
 
-                // ── Fase 4: Verificación de ECC ────────────────────────────────────
+                // ── Fase 5: Verificación de ECC ────────────────────────────────────
                 if (VerificarECC(MENSAJE, ECC))
                 {
                     LogToDisplay("✓ ECC correcto\n");
@@ -157,7 +178,7 @@ namespace Dem_v2
                     return;
                 }
 
-                // ── Fase 5: Procesamiento según formato del mensaje ────────────────
+                // ── Fase 6: Procesamiento según formato del mensaje ────────────────
                 LogToDisplay("\n");
                 switch (MENSAJE[0])
                 {
@@ -241,6 +262,23 @@ namespace Dem_v2
                 .ToList();
 
             return ecc;
+        }
+
+        public static bool Extension(List<int> lista)
+        {
+            foreach (int valor in lista.Distinct())
+            {
+                int first127 = lista.IndexOf(127); int last127 = lista.LastIndexOf(127);
+                int first122 = lista.IndexOf(122); int last122 = lista.LastIndexOf(122);
+                int first117 = lista.IndexOf(117); int last117 = lista.LastIndexOf(117);
+
+                if ((last127 - first127) > 10 || (last122 - first122) > 10 || (last117 - first117) > 10)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 
