@@ -87,6 +87,77 @@ namespace Demodulador_WinForm_1
             _waveDisplayManager?.AddSamples(samples);
         }
 
+        // ── Detector de silencio ─────────────────────────────────────────────────
+        // Acumula la duración del silencio continuo en el audio crudo.
+        // Opera sobre los bytes del callback DataAvailable, antes de cualquier
+        // demodulación, para detectar ausencia de portadora lo antes posible.
+        //
+        // Uso:
+        //   var sd = new SilenceDetector(umbralEnergia, silencioRequeridoMs);
+        //   if (sd.Actualizar(buffer, bytesRecorded))  → silencio sostenido detectado
+        //   sd.Reset()                                  → reiniciar al comenzar a grabar
+        private sealed class SilenceDetector
+        {
+            // Energía media por muestra a partir de la cual se considera "señal presente".
+            // Se calcula igual que en BFSKDemodulator: (short.MaxValue × 0.01)²
+            // Usamos energía por muestra para que sea independiente del tamaño del bloque.
+            private readonly double _umbralEnergiaPorMuestra;
+
+            // Milisegundos consecutivos de silencio necesarios para disparar el evento.
+            private readonly double _silencioRequeridoMs;
+
+            // Acumulador de silencio continuo (se resetea si llega señal).
+            private double _silencioAcumuladoMs;
+
+            // Tasa de muestreo para convertir muestras → ms.
+            private readonly int _sampleRate;
+
+            public SilenceDetector(double umbralEnergiaPorMuestra, double silencioRequeridoMs, int sampleRate = 44100)
+            {
+                _umbralEnergiaPorMuestra = umbralEnergiaPorMuestra;
+                _silencioRequeridoMs = silencioRequeridoMs;
+                _sampleRate = sampleRate;
+            }
+
+            // Devuelve true si el silencio acumulado superó el umbral requerido.
+            // buffer: bytes crudos de 16-bit PCM mono (little-endian).
+            public bool Actualizar(byte[] buffer, int bytesRecorded)
+            {
+                if (bytesRecorded <= 0) return false;
+
+                int sampleCount = bytesRecorded / 2;
+                double energiaTotal = 0.0;
+
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    short muestra = BitConverter.ToInt16(buffer, i * 2);
+                    energiaTotal += (double)muestra * muestra;
+                }
+
+                double energiaPorMuestra = energiaTotal / sampleCount;
+                double duracionBloqueMs = (sampleCount * 1000.0) / _sampleRate;
+
+                if (energiaPorMuestra < _umbralEnergiaPorMuestra)
+                {
+                    // Silencio: acumular duración
+                    _silencioAcumuladoMs += duracionBloqueMs;
+                    return _silencioAcumuladoMs >= _silencioRequeridoMs;
+                }
+                else
+                {
+                    // Señal presente: reiniciar el contador
+                    _silencioAcumuladoMs = 0.0;
+                    return false;
+                }
+            }
+
+            // Reiniciar el acumulador (llamar al inicio de cada grabación).
+            public void Reset() => _silencioAcumuladoMs = 0.0;
+
+            // Milisegundos de silencio acumulados hasta ahora (útil para logs).
+            public double SilencioAcumuladoMs => _silencioAcumuladoMs;
+        }
+
         public void IniciarCaptura()
         {
             if (_isRunning)
@@ -135,21 +206,27 @@ namespace Demodulador_WinForm_1
             for (int p = 0; p < PhaseCount; p++) syncBuffers[p] = new StringBuilder();
 
             int lockedPhase = -1;
-            StringBuilder decodeBuffer = new StringBuilder();
             StringBuilder bitAccumulator = new StringBuilder();
 
             const string startPattern = "01010101010101010101"; // 20 bits
-            int phasingStartOffset = 0;
             bool extensionDetected = false;
 
             Estado estado = Estado.EsperandoInicio;
-            int cooldownMs = 250; // 1000 (original)
+            int cooldownMs = 250;
             DateTime cooldownHasta = DateTime.MinValue;
-            DateTime inicioGrabacion = DateTime.MinValue;
 
-            // VHF: ~0.45 s por mensaje → timeout 2 s
-            // HF:  ~5.4 s por mensaje → timeout 10 s
-            int maxGrabacionSeg = vhfMode ? 2 : 10;
+            // ── Detector de silencio ─────────────────────────────────────────────
+            // Umbral: misma fórmula que BFSKDemodulator._energyThreshold pero
+            // normalizada por muestra (sin multiplicar por samplesPerSymbol).
+            // Esto lo hace independiente del tamaño del bloque de audio.
+            double umbralEnergiaPorMuestra = Math.Pow(short.MaxValue * 0.01, 2);
+
+            // VHF (1200 bps): mensaje más corto → silencio más breve para cortar rápido.
+            // HF  (100 bps):  símbolo = 10 ms → necesitamos más margen para no cortar
+            //                 entre símbolos lentos.
+            double silencioRequeridoMs = vhfMode ? 300.0 : 800.0;
+
+            var silenceDetector = new SilenceDetector(umbralEnergiaPorMuestra, silencioRequeridoMs);
 
             // ── Thread de procesamiento ──────────────────────────────────────────────
             // Consume mensajes de la cola y llama a ProcesarBits sin tocar el thread de audio.
@@ -185,7 +262,6 @@ namespace Demodulador_WinForm_1
             _waveIn.DataAvailable += (s, a) =>
             {
                 // ── Capturar muestras para visualización ──────────────────────────────
-                // Convertir bytes a shorts para el waveViewer
                 if (a.BytesRecorded > 0)
                 {
                     int sampleCount = a.BytesRecorded / 2;
@@ -211,32 +287,21 @@ namespace Demodulador_WinForm_1
                             estado = Estado.EsperandoInicio;
                             lockedPhase = -1;
                             _demod.ResetTiming();
+                            silenceDetector.Reset();
                             for (int p = 0; p < PhaseCount; p++) syncBuffers[p].Clear();
                         }
                         return;
                     }
                 }
 
-                // ── Chequeo de timeout ────────────────────────────────────────────────
-                lock (_lock)
-                {
-                    if (estado == Estado.Grabando)
-                    {
-                        if ((DateTime.Now - inicioGrabacion).TotalSeconds > maxGrabacionSeg)
-                        {
-                            LogToDisplay("Timeout de grabación\n");
-                            FinalizarCaptura("TIMEOUT");
-                        }
-                    }
-                }
-
-                bool debeFinalizarLoop = false;
-
+                // ── PASO 1: Acumular bits del bloque ─────────────────────────────────
+                // Los bits se procesan siempre antes de evaluar cualquier condición de
+                // corte, garantizando que ningún bit del bloque actual se pierda.
                 int phaseStart, phaseEnd;
                 lock (_lock) { phaseStart = (lockedPhase >= 0) ? lockedPhase : 0; }
                 lock (_lock) { phaseEnd = (lockedPhase >= 0) ? lockedPhase + 1 : PhaseCount; }
 
-                for (int ph = phaseStart; ph < phaseEnd && !debeFinalizarLoop; ph++)
+                for (int ph = phaseStart; ph < phaseEnd; ph++)
                 {
                     bool shouldProcess;
                     lock (_lock) { shouldProcess = (lockedPhase < 0 || ph == lockedPhase); }
@@ -277,42 +342,34 @@ namespace Demodulador_WinForm_1
                             }
                         }
 
-                        // ── ESTADO: Grabando ──────────────────────────────────────────
+                        // ── ESTADO: Grabando — solo acumular bits ─────────────────────
+                        // No se evalúa ninguna condición de corte aquí.
+                        // El silencio se evalúa al final del callback, una vez que
+                        // todos los bits del bloque ya están en bitAccumulator.
                         else if (estadoActual == Estado.Grabando)
                         {
                             lock (_lock)
                             {
                                 bitAccumulator.Append(bit);
-                                decodeBuffer.Append(bit);
-
-                                // Detección de EOS CONSECUTIVOS (dos valores 127 seguidos)
-                                if (decodeBuffer.Length >= 20)
-                                {
-                                    for (int w = 0; w <= decodeBuffer.Length - 40; w++)
-                                    {
-                                        string ventana1 = decodeBuffer.ToString(w, 10);
-                                        string ventana2 = decodeBuffer.ToString(w + 10, 10);
-
-                                        bool es127_1 = Decodificador.TryDeco(ventana1, out int val1) && (val1 == 127 || val1 == 117 || val1 == 122);
-                                        bool es127_2 = Decodificador.TryDeco(ventana2, out int val2) && (val2 == 127 || val2 == 117 || val2 == 122);
-
-                                        if (es127_1 && es127_2)
-                                        {
-                                            FinalizarCaptura("EOS");
-                                            debeFinalizarLoop = true;
-                                            break;
-                                        }
-                                    }
-
-                                    if (decodeBuffer.Length > 1000)
-                                    {
-                                        decodeBuffer.Remove(0, 1);
-                                    }
-                                }
                             }
                         }
+                    }
+                }
 
-                        if (debeFinalizarLoop) break;
+                // ── PASO 2: Evaluar silencio sobre el bloque completo ─────────────────
+                // Se ejecuta después de acumular todos los bits del bloque.
+                // silenceDetector.Actualizar() mide la energía RMS del audio crudo:
+                //   · Si hay señal  → resetea el contador interno y devuelve false.
+                //   · Si hay silencio → acumula ms y devuelve true al superar el umbral.
+                lock (_lock)
+                {
+                    if (estado == Estado.Grabando)
+                    {
+                        if (silenceDetector.Actualizar(a.Buffer, a.BytesRecorded))
+                        {
+                            LogToDisplay($"[Silencio] {silenceDetector.SilencioAcumuladoMs:F0} ms sin señal → finalizando captura\n");
+                            FinalizarCaptura("SILENCIO");
+                        }
                     }
                 }
 
@@ -321,31 +378,23 @@ namespace Demodulador_WinForm_1
                     ClearMAIN();
                     lockedPhase = ph;
                     _demod.LockPhase(ph);
-                    inicioGrabacion = DateTime.Now;
                     estado = Estado.Grabando;
-                    phasingStartOffset = 0;
-                    decodeBuffer.Clear();
                     bitAccumulator.Clear();
+                    silenceDetector.Reset();
                     LogToDisplay($"[IniciarGrabacion] Fase {ph} bloqueada.\n");
                 }
 
                 void FinalizarCaptura(string motivo)
                 {
-                    int offset = Math.Max(0, Math.Min(phasingStartOffset, bitAccumulator.Length));
-                    string capturado = bitAccumulator.ToString(offset, bitAccumulator.Length - offset);
+                    string capturado = bitAccumulator.ToString();
 
-                    LogToDisplay($"[FinalizarCaptura - {motivo}] Bits acumulados: {bitAccumulator.Length}, offset: {offset}, capturado: {capturado.Length} bits\n");
+                    LogToDisplay($"[FinalizarCaptura - {motivo}] {capturado.Length} bits capturados\n");
 
                     if (capturado.Length > 0)
-                    {
                         _mensajesCapturados.Enqueue(capturado);
-                    }
                     else
-                    {
                         LogToDisplay("[Advertencia] No se encoló mensaje: cadena vacía\n");
-                    }
 
-                    decodeBuffer.Clear();
                     bitAccumulator.Clear();
                     estado = Estado.Cooldown;
                     cooldownHasta = DateTime.Now.AddMilliseconds(cooldownMs);
