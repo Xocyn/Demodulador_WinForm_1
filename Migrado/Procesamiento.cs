@@ -15,11 +15,13 @@ namespace Dem_v2
     {
         private readonly RichTextBox _mainDisplay;
         private readonly Metodos _metodos;
+        private readonly Expansion _expansion;
 
         public Procesamiento(RichTextBox mainDisplay)
         {
             _mainDisplay = mainDisplay;
             _metodos = new Metodos(LogToDisplay);
+            _expansion = new Expansion(LogToDisplay);
         }
 
         /// <summary>
@@ -193,6 +195,8 @@ namespace Dem_v2
                         return;
                     }
 
+                    extension = true;
+
                 }
                 else // SIN EXTENSION
                 {
@@ -253,7 +257,7 @@ namespace Dem_v2
 
                 if (extension)
                 {
-                    Expansion.Decodificar(MENSAJE_EXT);
+                    _expansion.Decodificar(MENSAJE_EXT);
                 }
             }
             catch (Exception ex)
@@ -754,12 +758,19 @@ namespace Dem_v2
 
     public class Expansion
     {
-        public static void Decodificar(List<int> EXTENSION)
+        private readonly Action<string> _log;
+
+        public Expansion(Action<string> logCallback)
+        {
+            _log = logCallback ?? throw new ArgumentNullException(nameof(logCallback));
+        }
+
+        public void Decodificar(List<int> EXTENSION)
         {
             int i = 0;
             string eos = string.Empty;
 
-            LogToDisplay("\n");
+            _log("\n");
             Geografica.EliminarPosicionesImpares(EXTENSION);
             switch (EXTENSION[i])
             {
@@ -800,7 +811,7 @@ namespace Dem_v2
                     break;
                 default:
                     // No identificado
-                    LogToDisplay("Caracter no identificado\n");
+                    _log("Caracter no identificado\n");
                     return;
 
             }
@@ -812,7 +823,7 @@ namespace Dem_v2
             {
                 // EOS
                 eos = General.ACK(valor2);
-                LogToDisplay(eos);
+                _log(eos);
                 return;
             }
             else
@@ -856,7 +867,7 @@ namespace Dem_v2
                         break;
                     default:
                         // No identificado
-                        LogToDisplay("Caracter no identificado\n");
+                        _log("Caracter no identificado\n");
                         return;
                 }
             }
@@ -866,14 +877,14 @@ namespace Dem_v2
             {
                 // EOS
                 eos = General.ACK(valor3);
-                LogToDisplay(eos);
+                _log(eos);
                 return;
             }
 
             return;
         }
 
-        private static int res_mejorada(List<int> EXT, int i)
+        private int res_mejorada(List<int> EXT, int i)
         {
             // ACA ME FALTA SABER SI ES PETICION O SI NO HAY DATOS 
             // PUEDE SER 1 SOLO CARACTER 
@@ -881,13 +892,13 @@ namespace Dem_v2
 
             if (EXT[i] == 110)
             {
-                LogToDisplay("Peticion de datos\n");
+                _log("Peticion de datos\n");
                 return i + 1;
 
             }
             else if (EXT[i] == 126)
             {
-                LogToDisplay("Ningun dato disponible\n");
+                _log("Ningun dato disponible\n");
                 return i + 1;
             }
 
@@ -899,24 +910,24 @@ namespace Dem_v2
 
             List<int> res_D = General.SplitDigits2(res_I);
 
-            LogToDisplay($"Mejora de Latitud {res_D[0]}{res_D[1]}{res_D[2]}{res_D[3]}'' \n");
-            LogToDisplay($"Mejora de Longitud {res_D[4]}{res_D[5]}{res_D[6]}{res_D[7]}'' \n");
+            _log($"Mejora de Latitud {res_D[0]}{res_D[1]}{res_D[2]}{res_D[3]}'' \n");
+            _log($"Mejora de Longitud {res_D[4]}{res_D[5]}{res_D[6]}{res_D[7]}'' \n");
 
             return i + 4;
         }
 
-        private static int origen_punto_ref(List<int> EXT, int i)
+        private int origen_punto_ref(List<int> EXT, int i)
         {
             // Se leen 3 caracteres (30 bits) y se decodifican a un origen y punto de referencia de posicion
 
             if (EXT[i] == 110)
             {
-                LogToDisplay("Peticion de datos\n");
+                _log("Peticion de datos\n");
                 return i + 1;
             }
             else if (EXT[i] == 126)
             {
-                LogToDisplay("Ningun dato disponible\n");
+                _log("Ningun dato disponible\n");
                 return i + 1;
             }
 
@@ -980,24 +991,24 @@ namespace Dem_v2
                     break;
             }
 
-            LogToDisplay($"Dato de posicion procedentes de: {dispositivo}\n");
-            LogToDisplay($"Presicion del punto de referencia: {presicion[0]},{presicion[1]}\n");
-            LogToDisplay($"Punto de referencia: {punto_ref}\n");
+            _log($"Dato de posicion procedentes de: {dispositivo}\n");
+            _log($"Presicion del punto de referencia: {presicion[0]},{presicion[1]}\n");
+            _log($"Punto de referencia: {punto_ref}\n");
             return i + 3;
         }
 
-        private static int velocidad_actual(List<int> EXT, int i)
+        private int velocidad_actual(List<int> EXT, int i)
         {
             // Se leen 2 caracteres (20 bits) y se decodifican a la velocidad actual del barco
 
             if (EXT[i] == 110)
             {
-                LogToDisplay("Peticion de datos\n");
+                _log("Peticion de datos\n");
                 return i + 1;
             }
             else if (EXT[i] == 126)
             {
-                LogToDisplay("Ningun dato disponible\n");
+                _log("Ningun dato disponible\n");
                 return i + 1;
             }
 
@@ -1010,22 +1021,22 @@ namespace Dem_v2
             List<int> vel_d= General.SplitDigits2(vel_I);
 
 
-            Console.WriteLine($"Velocidad actual del barco: {vel_d[0]}{vel_d[1]}{vel_d[2]},{vel_d[3]} nudos\n");
+            _log($"Velocidad actual del barco: {vel_d[0]}{vel_d[1]}{vel_d[2]},{vel_d[3]} nudos\n");
             return i + 2;
         }
 
-        private static int ruta_actual(List<int> EXT, int i)
+        private int ruta_actual(List<int> EXT, int i)
         {
             // Se leen 2 caracteres (20 bits) y se decodifica la ruta actual del barco
 
             if (EXT[i] == 110)
             {
-                LogToDisplay("Peticion de datos\n");
+                _log("Peticion de datos\n");
                 return i + 1;
             }
             else if (EXT[i] == 126)
             {
-                LogToDisplay("Ningun dato disponible\n");
+                _log("Ningun dato disponible\n");
                 return i + 1;
             }
 
@@ -1037,21 +1048,21 @@ namespace Dem_v2
 
             List<int> ruta_d = General.SplitDigits2(ruta_I);
 
-            LogToDisplay($"Ruta actual del barco: {ruta_d[0]}{ruta_d[1]}{ruta_d[2]},{ruta_d[3]} grado\n");
+            _log($"Ruta actual del barco: {ruta_d[0]}{ruta_d[1]}{ruta_d[2]},{ruta_d[3]} grado\n");
             return i + 40;
         }
 
-        private static int identificador_adicional(List<int> EXT, int i)
+        private int identificador_adicional(List<int> EXT, int i)
         {
             // Se leen 10 caracteres (100 bits) y se decodifica un identificador adicional de la estacion
             if (EXT[i] == 110)
             {
-                LogToDisplay("Peticion de datos\n");
+                _log("Peticion de datos\n");
                 return i + 1;
             }
             else if (EXT[i] == 126)
             {
-                LogToDisplay("Ningun dato disponible\n");
+                _log("Ningun dato disponible\n");
                 return i + 1;
             }
 
@@ -1060,15 +1071,15 @@ namespace Dem_v2
 
             foreach (int i2 in id)
             {
-                new_id = Caracter(i2).Add;
+                new_id.Add(Caracter(i2));
             }
 
-            LogToDisplay($"Identificador adicional: {new_id}\n");
+            _log($"Identificador adicional: {string.Join("", new_id)}\n");
 
             return i + 10;
         }
 
-        private static int zona_geografica_ampliada(List<int> EXT, int i)
+        private int zona_geografica_ampliada(List<int> EXT, int i)
         {
             // se leen 12 caracteres (120 bits)
             List<int> EXT_2 = EXT.GetRange(i, 12);
@@ -1082,51 +1093,51 @@ namespace Dem_v2
 
             List<int> zona_d = General.SplitDigits2(zona_i);
 
-            LogToDisplay($"Mejora de Latitud ,{zona_d[0]}{zona_d[1]}{zona_d[2]}{zona_d[3]}'' \n");
-            LogToDisplay($"Mejora de Longitud ,{zona_d[4]}{zona_d[5]}{zona_d[6]}{zona_d[7]}'' \n");
+            _log($"Mejora de Latitud ,{zona_d[0]}{zona_d[1]}{zona_d[2]}{zona_d[3]}'' \n");
+            _log($"Mejora de Longitud ,{zona_d[4]}{zona_d[5]}{zona_d[6]}{zona_d[7]}'' \n");
 
-            LogToDisplay($"Resolucion adicional ventana vertical: {zona_d[8]}{zona_d[9]}{zona_d[10]}{zona_d[11]}\n");
-            LogToDisplay($"Resolucion adicional ventana horizontal: {zona_d[12]}{zona_d[13]}{zona_d[14]}{zona_d[15]}\n");
+            _log($"Resolucion adicional ventana vertical: {zona_d[8]}{zona_d[9]}{zona_d[10]}{zona_d[11]}\n");
+            _log($"Resolucion adicional ventana horizontal: {zona_d[12]}{zona_d[13]}{zona_d[14]}{zona_d[15]}\n");
 
             if (zona_d[8] == 126 || zona_d[9] == 126)
             {
-                LogToDisplay("No se dispone estimacion de velocidad\n");
+                _log("No se dispone estimacion de velocidad\n");
             }
             else
             {
-                LogToDisplay($"Velocidad actual del barco: {zona_d[16]}{zona_d[17]}{zona_d[18]},{zona_d[19]} nudos\n");
+                _log($"Velocidad actual del barco: {zona_d[16]}{zona_d[17]}{zona_d[18]},{zona_d[19]} nudos\n");
             }
 
             if (zona_d[10] == 126 || zona_d[11] == 126)
             {
-                LogToDisplay("No se dispone estimacion de trayectoria\n");
+                _log("No se dispone estimacion de trayectoria\n");
             }
             else
             {
-                LogToDisplay($"Trayectoria actual del barco: {zona_d[20]}{zona_d[21]}{zona_d[22]},{zona_d[23]} grados\n");
+                _log($"Trayectoria actual del barco: {zona_d[20]}{zona_d[21]}{zona_d[22]},{zona_d[23]} grados\n");
             }
 
             return i + 12;
         }
 
-        private static int numero_personas_a_bordo(List<int> EXT, int i)
+        private int numero_personas_a_bordo(List<int> EXT, int i)
         {
             // Se leen 2 caracteres (20 bits) y se decodifica el numero de personas a bordo
             if (EXT[i] == 110)
             {
-                LogToDisplay("Peticion de datos\n");
+                _log("Peticion de datos\n");
                 return i + 1;
             }
             else if (EXT[i] == 126)
             {
-                LogToDisplay("Ningun dato disponible\n");
+                _log("Ningun dato disponible\n");
                 return i + 1;
             }
 
             List<int> personas = EXT.GetRange(i, 2);
 
             string ppol = string.Join("", personas.Select(x => x.ToString("D2")));
-            LogToDisplay($"Numero de personas a bordo: {ppol}\n");
+            _log($"Numero de personas a bordo: {ppol}\n");
 
             return i + 2;
         }
