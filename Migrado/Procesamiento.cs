@@ -143,7 +143,8 @@ namespace Dem_v2
                 List<int> datos_respuesta = new List<int>();
                 List<int> MENSAJE_EXT = new();
                 List<int> ECC_EXT = new();
-                bool extension = false;
+                bool extension = false; bool ecc_ext = false;
+
 
                 // ── Fase 4: Extension?  -────────-──────────────────────────────────
 
@@ -188,11 +189,11 @@ namespace Dem_v2
                     if (VerificarECC(MENSAJE_EXT, ECC_EXT))
                     {
                         LogToDisplay("✓ ECC extension correcto\n");
+                        ecc_ext = true;
                     }
                     else
                     {
                         LogToDisplay("✗ Error en ECC extension\n");
-                        return;
                     }
 
                     extension = true;
@@ -255,7 +256,7 @@ namespace Dem_v2
 
                 // ── Fase 6: Procesamiento extension ────────────────────────────────
 
-                if (extension)
+                if (extension && ecc_ext)
                 {
                     _expansion.Decodificar(MENSAJE_EXT);
                 }
@@ -950,7 +951,7 @@ namespace Dem_v2
                     dispositivo = "LORAN-C diferencial";
                     break;
                 case 4:
-                    dispositivo = "LORAN-C sin dorregir";
+                    dispositivo = "LORAN-C sin corregir";
                     break;
                 case 5:
                     dispositivo = "GLONASS";
@@ -988,6 +989,7 @@ namespace Dem_v2
                     punto_ref = "OTRO";
                     break;
                 default:
+                    punto_ref = "¿¿??";
                     break;
             }
 
@@ -1048,8 +1050,8 @@ namespace Dem_v2
 
             List<int> ruta_d = General.SplitDigits2(ruta_I);
 
-            _log($"Ruta actual del barco: {ruta_d[0]}{ruta_d[1]}{ruta_d[2]},{ruta_d[3]} grado\n");
-            return i + 40;
+            _log($"Ruta actual del barco: {ruta_d[0]}{ruta_d[1]}{ruta_d[2]},{ruta_d[3]} grados\n");
+            return i + 2;
         }
 
         private int identificador_adicional(List<int> EXT, int i)
@@ -1093,8 +1095,8 @@ namespace Dem_v2
 
             List<int> zona_d = General.SplitDigits2(zona_i);
 
-            _log($"Mejora de Latitud ,{zona_d[0]}{zona_d[1]}{zona_d[2]}{zona_d[3]}'' \n");
-            _log($"Mejora de Longitud ,{zona_d[4]}{zona_d[5]}{zona_d[6]}{zona_d[7]}'' \n");
+            _log($"Mejora de Latitud: ,{zona_d[0]}{zona_d[1]}{zona_d[2]}{zona_d[3]}'' \n");
+            _log($"Mejora de Longitud: ,{zona_d[4]}{zona_d[5]}{zona_d[6]}{zona_d[7]}'' \n");
 
             _log($"Resolucion adicional ventana vertical: {zona_d[8]}{zona_d[9]}{zona_d[10]}{zona_d[11]}\n");
             _log($"Resolucion adicional ventana horizontal: {zona_d[12]}{zona_d[13]}{zona_d[14]}{zona_d[15]}\n");
