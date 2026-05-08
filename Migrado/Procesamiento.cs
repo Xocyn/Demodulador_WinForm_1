@@ -139,46 +139,81 @@ namespace Dem_v2
                 List<int> MENSAJE = MESSAGE.ToList();
                 List<int> ECC = MESSAGE.ToList();
                 List<int> datos_respuesta = new List<int>();
+                List<int> MENSAJE_EXT = new();
+                List<int> ECC_EXT = new();
+                bool extension = false;
 
                 // ── Fase 4: Extension?  -────────-──────────────────────────────────
 
-                if (Extension(MENSAJE))
+                if (Extension(MENSAJE)) // CON EXTENSION
                 {
                     int firstindex127 = MENSAJE.IndexOf(127); int firstindex117 = MENSAJE.IndexOf(117); int firstindex122 = MENSAJE.IndexOf(122);
+                    /*
+                     * Me faltan considerar los casos en los que el EOS no sea 127
+                     * tendría que desarrollar un metodo en el que le pase la lista y en caso de cualquier caracter EOS
+                     * me devuelva directamente el int del index
+                    */
                     List<int> MENSAJE_OG = MENSAJE.GetRange(0, firstindex127 + 8);
-                    List<int> MENSAJE_EXT = MENSAJE.GetRange(firstindex127 + 8, MENSAJE.Count - (firstindex127 + 8));
+                    MENSAJE_EXT = MENSAJE.GetRange(firstindex127 + 8, MENSAJE.Count - (firstindex127 + 8));
                     string m1 = string.Join(" ", MENSAJE_OG.Select(x => x.ToString("D2")));
-                    string m2= string.Join(" ", MENSAJE_EXT.Select(x => x.ToString("D2")));
+                    string m2 = string.Join(" ", MENSAJE_EXT.Select(x => x.ToString("D2")));
                     LogToDisplay($"MENSAJE: {m1}\n");
                     LogToDisplay($"MENSAJE DE EXTENSION: {m2}\n");
 
+                    MENSAJE = MENSAJE_OG;
+                    ECC = MENSAJE.ToList();
+                    Geografica.EliminarPosicionesImpares(ECC); // Obtengo los DX
+                    ECC = PrepararECC(ECC);
+                    if (VerificarECC(MENSAJE, ECC))
+                    {
+                        LogToDisplay("✓ ECC correcto\n");
+                    }
+                    else
+                    {
+                        LogToDisplay("✗ Error en ECC\n");
+                        return;
+                    }
+
+                    /*
+                     * no anda bien el Preparar ECC para la extension
+                     * revisar mañana
+                     * zzzzzzz
+                    */
+                    ECC_EXT = MENSAJE_EXT.ToList();
+                    Geografica.EliminarPosicionesImpares(ECC_EXT);
+                    ECC_EXT = PrepararECC_EXT(ECC_EXT);
+
+                    if (VerificarECC(MENSAJE_EXT, ECC_EXT))
+                    {
+                        LogToDisplay("✓ ECC extension correcto\n");
+                    }
+                    else
+                    {
+                        LogToDisplay("✗ Error en ECC extension\n");
+                        return;
+                    }
+
                 }
-                else
+                else // SIN EXTENSION
                 {
                     Geografica.EliminarPosicionesImpares(ECC); // Obtengo los DX
                     ECC = PrepararECC(ECC);
 
                     string mensaje_string = string.Join(" ", MENSAJE.Select(x => x.ToString("D2")));
                     LogToDisplay($"MENSAJE: {mensaje_string}\n");
-                }
-                /*
-                Geografica.EliminarPosicionesImpares(ECC); // Obtengo los DX
 
-                ECC = PrepararECC(ECC);
-                */
-
-                // ── Fase 5: Verificación de ECC ────────────────────────────────────
-                if (VerificarECC(MENSAJE, ECC))
-                {
-                    LogToDisplay("✓ ECC correcto\n");
-                }
-                else
-                {
-                    LogToDisplay("✗ Error en ECC\n");
-                    return;
+                    if (VerificarECC(MENSAJE, ECC))
+                    {
+                        LogToDisplay("✓ ECC correcto\n");
+                    }
+                    else
+                    {
+                        LogToDisplay("✗ Error en ECC\n");
+                        return;
+                    }
                 }
 
-                // ── Fase 6: Procesamiento según formato del mensaje ────────────────
+                // ── Fase 5: Procesamiento según formato del mensaje ────────────────
                 LogToDisplay("\n");
                 switch (MENSAJE[0])
                 {
@@ -213,6 +248,13 @@ namespace Dem_v2
                 }
 
                 LogToDisplay("\n");
+
+                // ── Fase 6: Procesamiento extension ────────────────────────────────
+
+                if (extension)
+                {
+                    Expansion.Decodificar(MENSAJE_EXT);
+                }
             }
             catch (Exception ex)
             {
@@ -220,9 +262,6 @@ namespace Dem_v2
             }
         }
 
-        /// <summary>
-        /// Verifica el ECC (Error Correcting Code) del mensaje
-        /// </summary>
         public bool VerificarECC(List<int> MESSAGE, List<int> ECC)
         {
             if (MESSAGE.Count < 6)
@@ -245,14 +284,10 @@ namespace Dem_v2
                 return false;
         }
 
-        /// <summary>
-        /// Prepara el ECC eliminando el primer elemento y los últimos 2
-        /// </summary>
         public List<int> PrepararECC(List<int> list)
         {
             if (list.Count < 4)
             {
-                LogToDisplay("MENSAJE demasiado corto para preparar ECC.\n");
                 return new List<int>();
             }
 
@@ -262,6 +297,15 @@ namespace Dem_v2
                 .ToList();
 
             return ecc;
+        }
+
+        public List<int> PrepararECC_EXT(List<int> list)
+        {
+            List<int> ecc = list
+                .Take(list.Count - 3)
+                .ToList();
+            return ecc;
+
         }
 
         public static bool Extension(List<int> lista)
@@ -705,6 +749,436 @@ namespace Dem_v2
                     _log($"Frecuencia Tx: {frec_canal_2}\n");
                 _log($"{ack}\n");
             }
+        }
+    }
+
+    public class Expansion
+    {
+        public static void Decodificar(List<int> EXTENSION)
+        {
+            int i = 0;
+            string eos = string.Empty;
+
+            LogToDisplay("\n");
+            Geografica.EliminarPosicionesImpares(EXTENSION);
+            switch (EXTENSION[i])
+            {
+                case 100:
+                    //  Resolusion mejorada de la posicion
+                    i++;
+                    i = res_mejorada(EXTENSION, i);
+                    break;
+                case 101:
+                    // Origen y punto de referencia de posicion 
+                    i++;
+                    i = origen_punto_ref(EXTENSION, i);
+                    break;
+                case 102:
+                    // Velocidad actual del barco
+                    i++;
+                    i = velocidad_actual(EXTENSION, i);
+                    break;
+                case 103:
+                    // Ruta actual del barco
+                    i++;
+                    i = ruta_actual(EXTENSION, i);
+                    break;
+                case 104:
+                    // Identificador adicional de la estacion
+                    i++;
+                    i = identificador_adicional(EXTENSION, i);
+                    break;
+                case 105:
+                    // Zona geofrafica ampliada
+                    i++;
+                    i = zona_geografica_ampliada(EXTENSION, i);
+                    break;
+                case 106:
+                    // Numero de personas a bordo
+                    i++;
+                    i = numero_personas_a_bordo(EXTENSION, i);
+                    break;
+                default:
+                    // No identificado
+                    LogToDisplay("Caracter no identificado\n");
+                    return;
+
+            }
+
+            // leer el caracter y si es EOS se va al final y sino es el Mensaje 2
+            int valor2 = EXTENSION[i];
+
+            if (valor2 == 127 || valor2 == 122 || valor2 == 117)
+            {
+                // EOS
+                eos = General.ACK(valor2);
+                LogToDisplay(eos);
+                return;
+            }
+            else
+            {
+                switch (valor2)
+                {
+                    case 100:
+                        //  Resolusion mejorada de la posicion
+                        i++;
+                        i = res_mejorada(EXTENSION, i);
+                        break;
+                    case 101:
+                        // Origen y punto de referencia de posicion 
+                        i++;
+                        i = origen_punto_ref(EXTENSION, i);
+                        break;
+                    case 102:
+                        // Velocidad actual del barco
+                        i++;
+                        i = velocidad_actual(EXTENSION, i);
+                        break;
+                    case 103:
+                        // Ruta actual del barco
+                        i++;
+                        i = ruta_actual(EXTENSION, i);
+                        break;
+                    case 104:
+                        // Identificador adicional de la estacion
+                        i++;
+                        i = identificador_adicional(EXTENSION, i);
+                        break;
+                    case 105:
+                        // Zona geofrafica ampliada
+                        i++;
+                        i = zona_geografica_ampliada(EXTENSION, i);
+                        break;
+                    case 106:
+                        // Numero de personas a bordo
+                        i++;
+                        i = numero_personas_a_bordo(EXTENSION, i);
+                        break;
+                    default:
+                        // No identificado
+                        LogToDisplay("Caracter no identificado\n");
+                        return;
+                }
+            }
+
+            int valor3 = EXTENSION[i];
+            if (valor3 == 127 || valor3 == 122 || valor3 == 117)
+            {
+                // EOS
+                eos = General.ACK(valor3);
+                LogToDisplay(eos);
+                return;
+            }
+
+            return;
+        }
+
+        private static int res_mejorada(List<int> EXT, int i)
+        {
+            // ACA ME FALTA SABER SI ES PETICION O SI NO HAY DATOS 
+            // PUEDE SER 1 SOLO CARACTER 
+            // o 4 CARACTERES
+
+            if (EXT[i] == 110)
+            {
+                LogToDisplay("Peticion de datos\n");
+                return i + 1;
+
+            }
+            else if (EXT[i] == 126)
+            {
+                LogToDisplay("Ningun dato disponible\n");
+                return i + 1;
+            }
+
+            List<int> res= EXT.GetRange(i, 4);
+
+            List<string> res_I = res
+            .Select(x => x.ToString("D2"))
+            .ToList();
+
+            List<int> res_D = General.SplitDigits2(res_I);
+
+            LogToDisplay($"Mejora de Latitud {res_D[0]}{res_D[1]}{res_D[2]}{res_D[3]}'' \n");
+            LogToDisplay($"Mejora de Longitud {res_D[4]}{res_D[5]}{res_D[6]}{res_D[7]}'' \n");
+
+            return i + 4;
+        }
+
+        private static int origen_punto_ref(List<int> EXT, int i)
+        {
+            // Se leen 3 caracteres (30 bits) y se decodifican a un origen y punto de referencia de posicion
+
+            if (EXT[i] == 110)
+            {
+                LogToDisplay("Peticion de datos\n");
+                return i + 1;
+            }
+            else if (EXT[i] == 126)
+            {
+                LogToDisplay("Ningun dato disponible\n");
+                return i + 1;
+            }
+
+            string dispositivo = string.Empty;
+            string punto_ref = string.Empty;
+
+
+            switch (EXT[i])
+            {
+                case 0:
+                    dispositivo = "NO VALIDO";
+                    break;
+                case 1:
+                    dispositivo = "GPS diferencial";
+                    break;
+                case 2:
+                    dispositivo = "GPS sin corregir";
+                    break;
+                case 3:
+                    dispositivo = "LORAN-C diferencial";
+                    break;
+                case 4:
+                    dispositivo = "LORAN-C sin dorregir";
+                    break;
+                case 5:
+                    dispositivo = "GLONASS";
+                    break;
+                case 6:
+                    dispositivo = "PUNTO DE REFERENCIA DE RADAR";
+                    break;
+                case 7:
+                    dispositivo = "DECCA";
+                    break;
+                case 8:
+                    dispositivo = "OTRA REFERENCIA";
+                    break;
+                default:
+                    dispositivo = "¿¿??";
+                    break;
+            }
+
+            int valor = EXT[i+1];
+
+            List<int> presicion = valor
+                .ToString()
+                .Select(c => int.Parse(c.ToString()))
+                .ToList();
+
+            switch (EXT[i+2])
+            {
+                case 0:
+                    punto_ref = "WGS-84";
+                    break;
+                case 1:
+                    punto_ref = "WGS-72";
+                    break;
+                case 2:
+                    punto_ref = "OTRO";
+                    break;
+                default:
+                    break;
+            }
+
+            LogToDisplay($"Dato de posicion procedentes de: {dispositivo}\n");
+            LogToDisplay($"Presicion del punto de referencia: {presicion[0]},{presicion[1]}\n");
+            LogToDisplay($"Punto de referencia: {punto_ref}\n");
+            return i + 3;
+        }
+
+        private static int velocidad_actual(List<int> EXT, int i)
+        {
+            // Se leen 2 caracteres (20 bits) y se decodifican a la velocidad actual del barco
+
+            if (EXT[i] == 110)
+            {
+                LogToDisplay("Peticion de datos\n");
+                return i + 1;
+            }
+            else if (EXT[i] == 126)
+            {
+                LogToDisplay("Ningun dato disponible\n");
+                return i + 1;
+            }
+
+            List<int> vel = EXT.GetRange(i, 2);
+
+            List<string> vel_I = vel
+            .Select(x => x.ToString("D2"))
+            .ToList();
+
+            List<int> vel_d= General.SplitDigits2(vel_I);
+
+
+            Console.WriteLine($"Velocidad actual del barco: {vel_d[0]}{vel_d[1]}{vel_d[2]},{vel_d[3]} nudos\n");
+            return i + 2;
+        }
+
+        private static int ruta_actual(List<int> EXT, int i)
+        {
+            // Se leen 2 caracteres (20 bits) y se decodifica la ruta actual del barco
+
+            if (EXT[i] == 110)
+            {
+                LogToDisplay("Peticion de datos\n");
+                return i + 1;
+            }
+            else if (EXT[i] == 126)
+            {
+                LogToDisplay("Ningun dato disponible\n");
+                return i + 1;
+            }
+
+            List<int> ruta = EXT.GetRange(i, 2);
+
+            List<string> ruta_I = ruta
+            .Select(x => x.ToString("D2"))
+            .ToList();
+
+            List<int> ruta_d = General.SplitDigits2(ruta_I);
+
+            LogToDisplay($"Ruta actual del barco: {ruta_d[0]}{ruta_d[1]}{ruta_d[2]},{ruta_d[3]} grado\n");
+            return i + 40;
+        }
+
+        private static int identificador_adicional(List<int> EXT, int i)
+        {
+            // Se leen 10 caracteres (100 bits) y se decodifica un identificador adicional de la estacion
+            if (EXT[i] == 110)
+            {
+                LogToDisplay("Peticion de datos\n");
+                return i + 1;
+            }
+            else if (EXT[i] == 126)
+            {
+                LogToDisplay("Ningun dato disponible\n");
+                return i + 1;
+            }
+
+            List<int> id = EXT.GetRange(i, 10);
+            var new_id = new List<string>();
+
+            foreach (int i2 in id)
+            {
+                new_id = Caracter(i2).Add;
+            }
+
+            LogToDisplay($"Identificador adicional: {new_id}\n");
+
+            return i + 10;
+        }
+
+        private static int zona_geografica_ampliada(List<int> EXT, int i)
+        {
+            // se leen 12 caracteres (120 bits)
+            List<int> EXT_2 = EXT.GetRange(i, 12);
+
+            List<string> zona_i = EXT_2
+            .Select(x => x.ToString("D2"))
+            .ToList();
+
+            // PUEDEN EXISTIR CARACTERES 126
+            // SI LEE 126 OCUPA MAS DE 2 DIGITOS
+
+            List<int> zona_d = General.SplitDigits2(zona_i);
+
+            LogToDisplay($"Mejora de Latitud ,{zona_d[0]}{zona_d[1]}{zona_d[2]}{zona_d[3]}'' \n");
+            LogToDisplay($"Mejora de Longitud ,{zona_d[4]}{zona_d[5]}{zona_d[6]}{zona_d[7]}'' \n");
+
+            LogToDisplay($"Resolucion adicional ventana vertical: {zona_d[8]}{zona_d[9]}{zona_d[10]}{zona_d[11]}\n");
+            LogToDisplay($"Resolucion adicional ventana horizontal: {zona_d[12]}{zona_d[13]}{zona_d[14]}{zona_d[15]}\n");
+
+            if (zona_d[8] == 126 || zona_d[9] == 126)
+            {
+                LogToDisplay("No se dispone estimacion de velocidad\n");
+            }
+            else
+            {
+                LogToDisplay($"Velocidad actual del barco: {zona_d[16]}{zona_d[17]}{zona_d[18]},{zona_d[19]} nudos\n");
+            }
+
+            if (zona_d[10] == 126 || zona_d[11] == 126)
+            {
+                LogToDisplay("No se dispone estimacion de trayectoria\n");
+            }
+            else
+            {
+                LogToDisplay($"Trayectoria actual del barco: {zona_d[20]}{zona_d[21]}{zona_d[22]},{zona_d[23]} grados\n");
+            }
+
+            return i + 12;
+        }
+
+        private static int numero_personas_a_bordo(List<int> EXT, int i)
+        {
+            // Se leen 2 caracteres (20 bits) y se decodifica el numero de personas a bordo
+            if (EXT[i] == 110)
+            {
+                LogToDisplay("Peticion de datos\n");
+                return i + 1;
+            }
+            else if (EXT[i] == 126)
+            {
+                LogToDisplay("Ningun dato disponible\n");
+                return i + 1;
+            }
+
+            List<int> personas = EXT.GetRange(i, 2);
+
+            string ppol = string.Join("", personas.Select(x => x.ToString("D2")));
+            LogToDisplay($"Numero de personas a bordo: {ppol}\n");
+
+            return i + 2;
+        }
+
+        private static string Caracter(int h)
+        {
+            return h switch
+            {
+                0 => "0",
+                1 => "1",
+                2 => "2",
+                3 => "3",
+                4 => "4",
+                5 => "5",
+                6 => "6",
+                7 => "7",
+                8 => "8",
+                9 => "9",
+                10 => "Sin utilizar",
+                11 => "A",
+                12 => "B",
+                13 => "C",
+                14 => "D",
+                15 => "E",
+                16 => "F",
+                17 => "G",
+                18 => "H",
+                19 => "I",
+                20 => "J",
+                21 => "K",
+                22 => "L",
+                23 => "M",
+                24 => "N",
+                25 => "O",
+                26 => "P",
+                27 => "Q",
+                28 => "R",
+                29 => "S",
+                30 => "T",
+                31 => "U",
+                32 => "V",
+                33 => "W",
+                34 => "X",
+                35 => "Y",
+                36 => "Z",
+                37 => ".",
+                38 => ",",
+                39 => "-",
+                40 => "/",
+                41 => " ",
+                _ => "¿¿??"
+            };
         }
     }
 }
