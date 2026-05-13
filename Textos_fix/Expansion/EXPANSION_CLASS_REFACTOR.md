@@ -134,15 +134,15 @@ _log($"Identificador adicional: {string.Join("", new_id)}\n");
 
 La clase `Expansion` maneja los siguientes tipos de extensiones:
 
-| Código | Descripción | Función |
-|--------|-------------|---------|
-| 100 | Resolución mejorada de posición | `res_mejorada()` |
-| 101 | Origen y punto de referencia de posición | `origen_punto_ref()` |
-| 102 | Velocidad actual del barco | `velocidad_actual()` |
-| 103 | Ruta actual del barco | `ruta_actual()` |
-| 104 | Identificador adicional de la estación | `identificador_adicional()` |
-| 105 | Zona geográfica ampliada | `zona_geografica_ampliada()` |
-| 106 | Número de personas a bordo | `numero_personas_a_bordo()` |
+| Código | Descripción                              | Función                     |
+|--------|------------------------------------------|-----------------------------|
+| 100    | Resolución mejorada de posición          | `res_mejorada()`            |
+| 101    | Origen y punto de referencia de posición | `origen_punto_ref()`        |
+| 102    | Velocidad actual del barco               | `velocidad_actual()`        |
+| 103    | Ruta actual del barco                    | `ruta_actual()`             |
+| 104    | Identificador adicional de la estación   | `identificador_adicional()` |
+| 105    | Zona geográfica ampliada                 | `zona_geografica_ampliada()`|
+| 106    | Número de personas a bordo               | `numero_personas_a_bordo()` |
 
 ---
 

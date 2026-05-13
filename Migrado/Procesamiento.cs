@@ -2,6 +2,8 @@ using MathNet.Numerics;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data;
+using System.Text;
 using System.Windows.Forms;
 
 namespace Dem_v2
@@ -143,21 +145,33 @@ namespace Dem_v2
                 List<int> datos_respuesta = new List<int>();
                 List<int> MENSAJE_EXT = new();
                 List<int> ECC_EXT = new();
+                List<int> MENSAJE_OG = new();
                 bool extension = false; bool ecc_ext = false;
 
+                List<Mensaje> HISTORIAL = new List<Mensaje>(); // Almaceno mensajes para posibles respuestas o procesamientos posteriores
 
                 // ── Fase 4: Extension?  -────────-──────────────────────────────────
 
                 if (Extension(MENSAJE)) // CON EXTENSION
                 {
                     int firstindex127 = MENSAJE.IndexOf(127); int firstindex117 = MENSAJE.IndexOf(117); int firstindex122 = MENSAJE.IndexOf(122);
-                    /*
-                     * Me faltan considerar los casos en los que el EOS no sea 127
-                     * tendría que desarrollar un metodo en el que le pase la lista y en caso de cualquier caracter EOS
-                     * me devuelva directamente el int del index
-                    */
-                    List<int> MENSAJE_OG = MENSAJE.GetRange(0, firstindex127 + 8);
-                    MENSAJE_EXT = MENSAJE.GetRange(firstindex127 + 8, MENSAJE.Count - (firstindex127 + 8));
+                    
+                    if (firstindex127 != -1)
+                    {
+                        MENSAJE_OG = MENSAJE.GetRange(0, firstindex127 + 8);
+                        MENSAJE_EXT = MENSAJE.GetRange(firstindex127 + 8, MENSAJE.Count - (firstindex127 + 8));
+                    }
+                    else if (firstindex122 != -1)
+                    {
+                        MENSAJE_OG = MENSAJE.GetRange(0, firstindex122 + 8);
+                        MENSAJE_EXT = MENSAJE.GetRange(firstindex122 + 8, MENSAJE.Count - (firstindex122 + 8));
+                    }
+                    else if (firstindex117 != -1)
+                    {
+                        MENSAJE_OG = MENSAJE.GetRange(0, firstindex117 + 8);
+                        MENSAJE_EXT = MENSAJE.GetRange(firstindex117 + 8, MENSAJE.Count - (firstindex117 + 8));
+                    }
+
                     string m1 = string.Join(" ", MENSAJE_OG.Select(x => x.ToString("D2")));
                     string m2 = string.Join(" ", MENSAJE_EXT.Select(x => x.ToString("D2")));
                     LogToDisplay($"MENSAJE: {m1}\n");
@@ -177,11 +191,6 @@ namespace Dem_v2
                         return;
                     }
 
-                    /*
-                     * no anda bien el Preparar ECC para la extension
-                     * revisar mañana
-                     * zzzzzzz
-                    */
                     ECC_EXT = MENSAJE_EXT.ToList();
                     Geografica.EliminarPosicionesImpares(ECC_EXT);
                     ECC_EXT = PrepararECC_EXT(ECC_EXT);
@@ -227,6 +236,17 @@ namespace Dem_v2
                         break;
                     case 112:
                         datos_respuesta = _metodos.MSocorro(MENSAJE);
+
+                        Mensaje Socorro = new Mensaje()
+                        {
+                            Mensaje_List = MENSAJE,
+                            necesita_respuesta = true,
+                            Fecha_recepcion = DateTime.Now,
+                            data_respuesta = datos_respuesta,
+                            Formato = 112,
+                            extension = extension,
+                            Mensaje_ext = MENSAJE_EXT
+                        };
 
                         //if (MostrarMenuSocorro())
                         //{
@@ -1194,4 +1214,16 @@ namespace Dem_v2
             };
         }
     }
+
+    public class Mensaje
+    {
+        public List<int>? Mensaje_List { get; set; } // Acepta NULLs
+        public DateTime Fecha_recepcion { get; set; }
+        public bool necesita_respuesta { get; set; }
+        public List<int>? data_respuesta { get; set; }
+        public int Formato { get; set; }
+        public bool extension { get; set; } 
+        public List<int>? Mensaje_ext { get; set; }
+    }
+   
 }

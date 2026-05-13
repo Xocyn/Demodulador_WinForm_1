@@ -33,6 +33,8 @@
             dispositivos = new Label();
             combox_dispositivos = new ComboBox();
             splitContainer1 = new SplitContainer();
+            flowLayoutPanel1 = new FlowLayoutPanel();
+            lista_mensajes = new ListBox();
             DISPLAYSECUNDARIO = new RichTextBox();
             MAINDISPLAY = new RichTextBox();
             waveViewer1 = new WaveViewerControl();
@@ -40,12 +42,13 @@
             splitContainer1.Panel1.SuspendLayout();
             splitContainer1.Panel2.SuspendLayout();
             splitContainer1.SuspendLayout();
+            flowLayoutPanel1.SuspendLayout();
             SuspendLayout();
             // 
             // label_banda
             // 
             label_banda.AutoSize = true;
-            label_banda.Location = new Point(23, 17);
+            label_banda.Location = new Point(26, 27);
             label_banda.Name = "label_banda";
             label_banda.Size = new Size(127, 20);
             label_banda.TabIndex = 0;
@@ -55,7 +58,7 @@
             // 
             combox_hf_vhf.FormattingEnabled = true;
             combox_hf_vhf.Items.AddRange(new object[] { "MF/HF", "VHF" });
-            combox_hf_vhf.Location = new Point(164, 16);
+            combox_hf_vhf.Location = new Point(167, 26);
             combox_hf_vhf.Name = "combox_hf_vhf";
             combox_hf_vhf.Size = new Size(115, 28);
             combox_hf_vhf.TabIndex = 1;
@@ -64,7 +67,7 @@
             // dispositivos
             // 
             dispositivos.AutoSize = true;
-            dispositivos.Location = new Point(23, 61);
+            dispositivos.Location = new Point(26, 71);
             dispositivos.Name = "dispositivos";
             dispositivos.Size = new Size(174, 20);
             dispositivos.TabIndex = 2;
@@ -73,7 +76,7 @@
             // combox_dispositivos
             // 
             combox_dispositivos.FormattingEnabled = true;
-            combox_dispositivos.Location = new Point(203, 58);
+            combox_dispositivos.Location = new Point(206, 68);
             combox_dispositivos.Name = "combox_dispositivos";
             combox_dispositivos.Size = new Size(245, 28);
             combox_dispositivos.TabIndex = 3;
@@ -81,25 +84,42 @@
             // 
             // splitContainer1
             // 
-            splitContainer1.Location = new Point(23, 109);
+            splitContainer1.Location = new Point(23, 122);
             splitContainer1.Name = "splitContainer1";
             // 
             // splitContainer1.Panel1
             // 
+            splitContainer1.Panel1.Controls.Add(flowLayoutPanel1);
             splitContainer1.Panel1.Controls.Add(DISPLAYSECUNDARIO);
             // 
             // splitContainer1.Panel2
             // 
             splitContainer1.Panel2.Controls.Add(MAINDISPLAY);
-            splitContainer1.Size = new Size(894, 357);
-            splitContainer1.SplitterDistance = 298;
+            splitContainer1.Size = new Size(984, 414);
+            splitContainer1.SplitterDistance = 328;
             splitContainer1.TabIndex = 4;
+            // 
+            // flowLayoutPanel1
+            // 
+            flowLayoutPanel1.Controls.Add(lista_mensajes);
+            flowLayoutPanel1.Location = new Point(3, 217);
+            flowLayoutPanel1.Name = "flowLayoutPanel1";
+            flowLayoutPanel1.Size = new Size(322, 194);
+            flowLayoutPanel1.TabIndex = 1;
+            // 
+            // lista_mensajes
+            // 
+            lista_mensajes.FormattingEnabled = true;
+            lista_mensajes.Location = new Point(3, 3);
+            lista_mensajes.Name = "lista_mensajes";
+            lista_mensajes.Size = new Size(319, 184);
+            lista_mensajes.TabIndex = 0;
             // 
             // DISPLAYSECUNDARIO
             // 
             DISPLAYSECUNDARIO.Location = new Point(3, 3);
             DISPLAYSECUNDARIO.Name = "DISPLAYSECUNDARIO";
-            DISPLAYSECUNDARIO.Size = new Size(292, 351);
+            DISPLAYSECUNDARIO.Size = new Size(322, 208);
             DISPLAYSECUNDARIO.TabIndex = 0;
             DISPLAYSECUNDARIO.Text = "";
             // 
@@ -107,7 +127,7 @@
             // 
             MAINDISPLAY.Location = new Point(3, 3);
             MAINDISPLAY.Name = "MAINDISPLAY";
-            MAINDISPLAY.Size = new Size(586, 351);
+            MAINDISPLAY.Size = new Size(649, 411);
             MAINDISPLAY.TabIndex = 0;
             MAINDISPLAY.Text = "";
             // 
@@ -115,18 +135,17 @@
             // 
             waveViewer1.BackColor = Color.Black;
             waveViewer1.ForeColor = Color.Lime;
-            waveViewer1.Location = new Point(454, 6);
+            waveViewer1.Location = new Point(471, 16);
             waveViewer1.Margin = new Padding(0);
             waveViewer1.Name = "waveViewer1";
-            waveViewer1.Size = new Size(463, 100);
+            waveViewer1.Size = new Size(536, 100);
             waveViewer1.TabIndex = 5;
-
             // 
             // Demodulador_DSC
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(946, 490);
+            ClientSize = new Size(1028, 573);
             Controls.Add(waveViewer1);
             Controls.Add(splitContainer1);
             Controls.Add(combox_dispositivos);
@@ -139,6 +158,7 @@
             splitContainer1.Panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)splitContainer1).EndInit();
             splitContainer1.ResumeLayout(false);
+            flowLayoutPanel1.ResumeLayout(false);
             ResumeLayout(false);
             PerformLayout();
         }
@@ -153,5 +173,7 @@
         public RichTextBox DISPLAYSECUNDARIO;
         public RichTextBox MAINDISPLAY;
         public WaveViewerControl waveViewer1;
+        private FlowLayoutPanel flowLayoutPanel1;
+        private ListBox lista_mensajes;
     }
 }
