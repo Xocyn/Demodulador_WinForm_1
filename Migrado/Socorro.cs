@@ -16,7 +16,7 @@ namespace Dem_v2
             {
                 100 => "Incendio/Explosión",
                 101 => "Inundación",
-                102 => "Colision",
+                102 => "Colisión",
                 103 => "Encallado",
                 104 => "Peligro de zozobra",
                 105 => "Naufragio",

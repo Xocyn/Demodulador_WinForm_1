@@ -1,3 +1,4 @@
+using Demodulador_WinForm_1.Migrado;
 using MathNet.Numerics;
 using System;
 using System.Collections;
@@ -5,6 +6,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Text;
 using System.Windows.Forms;
+using static System.Windows.Forms.DataFormats;
 
 namespace Dem_v2
 {
@@ -12,46 +14,43 @@ namespace Dem_v2
     /// Clase de procesamiento que maneja la decodificación de mensajes DSC.
     /// THREAD-SAFE: Recibe una referencia al control RichTextBox del formulario
     /// y usa Invoke() para escribir en UI desde threads diferentes.
+    /// 
+    /// Integración de DisplayLogger:
+    /// - Escribe en MAINDISPLAY en tiempo real
+    /// - Almacena campos estructurados para guardar en archivo
+    /// - Thread-safe mediante callbacks y locks
     /// </summary>
     public class Procesamiento
     {
         private readonly RichTextBox _mainDisplay;
+        private readonly DisplayLogger _logger;
         private readonly Metodos _metodos;
         private readonly Expansion _expansion;
 
         public Procesamiento(RichTextBox mainDisplay)
         {
             _mainDisplay = mainDisplay;
-            _metodos = new Metodos(LogToDisplay);
-            _expansion = new Expansion(LogToDisplay);
+            _logger = new DisplayLogger(mainDisplay);
+
+            // Pasar DisplayLogger y LogToDisplay a Metodos y Expansion
+            // DisplayLogger permite acceso a RegistrarCampo(), EstablecerFormato(), etc.
+            _metodos = new Metodos(LogToDisplay, _logger);
+            _expansion = new Expansion(LogToDisplay, _logger);
         }
 
         /// <summary>
         /// Método helper que escribe en el MAINDISPLAY de forma thread-safe.
         /// Detecta si estamos en el thread de UI y usa Invoke() si es necesario.
+        /// También registra el mensaje en el DisplayLogger para almacenamiento.
         /// </summary>
         private void LogToDisplay(string message)
         {
-            if (_mainDisplay?.InvokeRequired == true)
-            {
-                _mainDisplay.Invoke(() => _mainDisplay.AppendText(message));
-            }
-            else if (_mainDisplay != null)
-            {
-                _mainDisplay.AppendText(message);
-            }
+            _logger.Log(message);
         }
 
         private void ClearDisplay()
         {
-            if (_mainDisplay?.InvokeRequired == true)
-            {
-                _mainDisplay.Invoke(() => _mainDisplay.Clear());
-            }
-            else if (_mainDisplay != null)
-            {
-                _mainDisplay.Clear();
-            }
+            _logger.LimpiarDisplay();
         }
 
         /// <summary>
@@ -229,6 +228,11 @@ namespace Dem_v2
 
                 // ── Fase 5: Procesamiento según formato del mensaje ────────────────
                 LogToDisplay("\n");
+
+                // Determinar formato y establecerlo en el logger
+                string formatoMensaje = FormatSpecifier.titulo(MENSAJE[0]);
+                _logger.EstablecerFormato(formatoMensaje);
+
                 switch (MENSAJE[0])
                 {
                     case 102:
@@ -256,10 +260,10 @@ namespace Dem_v2
                         //}
                         break;
                     case 114:
-                        _metodos.MGrupos(MENSAJE);
+                        _metodos.MGrupos(MENSAJE); 
                         break;
                     case 116:
-                        _metodos.MAllShips(MENSAJE);
+                        _metodos.MAllShips(MENSAJE);  
                         break;
                     case 120:
                         _metodos.MIndividual(MENSAJE);
@@ -280,6 +284,10 @@ namespace Dem_v2
                 {
                     _expansion.Decodificar(MENSAJE_EXT);
                 }
+
+                // ── Guardar mensaje en archivo ────────────────────────────────────
+                _logger.GuardarMensaje();
+
             }
             catch (Exception ex)
             {
@@ -308,7 +316,7 @@ namespace Dem_v2
             else
                 return false;
         }
-
+                
         public List<int> PrepararECC(List<int> list)
         {
             if (list.Count < 4)
@@ -354,14 +362,17 @@ namespace Dem_v2
     /// <summary>
     /// Clase que contiene los métodos específicos para cada tipo de mensaje DSC.
     /// Recibe un delegate para logging que es thread-safe.
+    /// También recibe una referencia a DisplayLogger para acceso a RegistrarCampo() y otros métodos.
     /// </summary>
     public class Metodos
     {
         private readonly Action<string> _log;
+        private readonly DisplayLogger _logger;
 
-        public Metodos(Action<string> logAction)
+        public Metodos(Action<string> logAction, DisplayLogger logger)
         {
             _log = logAction;
+            _logger = logger;
         }
 
         // ── GEOGRAFICA─────────────────────────────────────────────────────
@@ -418,33 +429,61 @@ namespace Dem_v2
                 }
             }
 
-            _log($"Formato: {FormatSpecifier.Formato(mensaje[0])}\n");
-            _log($"Área Geográfica: {area}\n");
-            _log($"Categoría: {categoria}\n");
-            _log($"MMSI: {mmsi}\n");
-            _log($"Primer Telemando: {primer_tel}\n");
+            _log($"Formato: {FormatSpecifier.Formato(mensaje[0])}\n"); _logger.RegistrarCampo("Formato", FormatSpecifier.Formato(mensaje[0]));
+            _log($"Área Geográfica: {area}\n"); _logger.RegistrarCampo("Área Geográfica", area);
+            _log($"Categoría: {categoria}\n"); _logger.RegistrarCampo("Categoría", categoria);
+            _log($"MMSI: {mmsi}\n"); _logger.RegistrarCampo("MMSI", mmsi);
+            _log($"Primer Telemando: {primer_tel}\n"); _logger.RegistrarCampo("Primer Telemando", primer_tel);
 
             if (mensaje[14] == 112)
             {
                 _log($"MMSI Socorro: {mmsi_socorro}\n");
+                _logger.RegistrarCampo("MMSI Socorro", mmsi_socorro);
+
                 _log($"Tipo de emergencia: {tipoEmergencia}\n");
+                _logger.RegistrarCampo("Tipo de emergencia", tipoEmergencia);
+
                 _log($"Coordenadas: {coordenadas}\n");
+                _logger.RegistrarCampo("Coordenadas", coordenadas);
+
                 _log($"UTC: {utc}\n");
+                _logger.RegistrarCampo("UTC", utc);
+
                 _log($"Siguiente Comunicación: {sig_comunicaciones}\n");
+                _logger.RegistrarCampo("Siguiente Comunicación", sig_comunicaciones);
+
                 _log($"{ack}\n");
+                _logger.RegistrarCampo("ACK", ack);
             }
             else
             {
                 _log($"Segundo Telemando: {segundo_tel}\n");
+                _logger.RegistrarCampo("Segundo Telemando", segundo_tel);
+
                 if (canal)
+                {
                     _log($"Canal Rx: {frec_canal_1}\n");
+                    _logger.RegistrarCampo("Canal Rx", frec_canal_1);
+                }
                 else
+                {
                     _log($"Frecuencia Rx: {frec_canal_1}\n");
+                    _logger.RegistrarCampo("Frecuencia Rx", frec_canal_1);
+                }
+
                 if (canal2)
+                {
                     _log($"Canal Tx: {frec_canal_2}\n");
+                    _logger.RegistrarCampo("Canal Tx", frec_canal_2);
+                }
                 else
+                {
                     _log($"Frecuencia Tx: {frec_canal_2}\n");
+                    _logger.RegistrarCampo("Frecuencia Tx", frec_canal_2);
+                }
+
                 _log($"ACK: {ack}\n");
+                _logger.RegistrarCampo("ACK", ack);
             }
         }
 
@@ -525,54 +564,62 @@ namespace Dem_v2
                 }
             }
 
-            _log($"Formato: {FormatSpecifier.Formato(format)}\n");
-            _log($"MMSI Receptor: {mmsi_receptor}\n");
-            _log($"Categoría: {categoria}\n");
-            _log($"MMSI Transmisor: {mmsi_transmisor}\n");
-            _log($"Primer Telemando: {primer_tel}\n");
+            _log($"Formato: {FormatSpecifier.Formato(format)}\n"); _logger.RegistrarCampo("Formato", FormatSpecifier.Formato(format));
+            _log($"MMSI Receptor: {mmsi_receptor}\n"); _logger.RegistrarCampo("MMSI Receptor", mmsi_receptor);
+            _log($"Categoría: {categoria}\n"); _logger.RegistrarCampo("Categoría", categoria);
+            _log($"MMSI Transmisor: {mmsi_transmisor}\n"); _logger.RegistrarCampo("MMSI Transmisor", mmsi_transmisor);
+            _log($"Primer Telemando: {primer_tel}\n"); _logger.RegistrarCampo("Primer Telemando", primer_tel);
 
             if (mensaje[14] == 112)
             {
-                _log($"MMSI Socorro: {mmsi_socorro}\n");
-                _log($"Tipo de emergencia: {tipoEmergencia}\n");
-                _log($"Coordenadas: {coordenadas}\n");
-                _log($"UTC: {utc}\n");
-                _log($"Siguiente Comunicación: {sig_comunicaciones}\n");
-                _log($"{ack}\n");
+                _log($"MMSI Socorro: {mmsi_socorro}\n"); _logger.RegistrarCampo("MMSI Socorro", mmsi_socorro);
+                _log($"Tipo de emergencia: {tipoEmergencia}\n"); _logger.RegistrarCampo("Tipo de emergencia", tipoEmergencia);
+                _log($"Coordenadas: {coordenadas}\n"); _logger.RegistrarCampo("Coordenadas", coordenadas);
+                _log($"UTC: {utc}\n"); _logger.RegistrarCampo("UTC", utc);
+                _log($"Siguiente Comunicación: {sig_comunicaciones}\n"); _logger.RegistrarCampo("Siguiente Comunicación", sig_comunicaciones);
+                _log($"{ack}\n"); _logger.RegistrarCampo("ACK", ack);
             }
             else
             {
-                _log($"Segundo Telemando: {segundo_tel}\n");
+                _log($"Segundo Telemando: {segundo_tel}\n"); _logger.RegistrarCampo("Segundo Telemando", segundo_tel);  
                 if (posicion.Count > 0)
                 {
                     if (posicion[posicion.Count - 1] == 117)
                     {
                         posicion_string = "Solicitud de posición";
-                        _log($"Posición: {posicion_string}\n");
+                        _log($"Posición: {posicion_string}\n"); _logger.RegistrarCampo("Posición", posicion_string);
                     }
                     else
                     {
                         posicion_string = Geografica.Posicion(posicion);
-                        _log($"Posición: {posicion_string}\n");
-                        _log($"UTC: {utc}\n");
+                        _log($"Posición: {posicion_string}\n"); _logger.RegistrarCampo("Posición", posicion_string);
+                        _log($"UTC: {utc}\n"); _logger.RegistrarCampo("UTC", utc);
                     }
                 }
                 else if (Posicion_2)
                 {
-                    _log($"Posición: {frec_canal_1}\n");
+                    _log($"Posición: {frec_canal_1}\n"); _logger.RegistrarCampo("Posición", frec_canal_1);
                 }
                 else
                 {
                     if (canal)
-                        _log($"Canal Rx: {frec_canal_1}\n");
+                    {
+                        _log($"Canal Rx: {frec_canal_1}\n"); _logger.RegistrarCampo("Canal Rx", frec_canal_1);
+                    }
                     else
-                        _log($"Frecuencia Rx: {frec_canal_1}\n");
+                    {
+                        _log($"Frecuencia Rx: {frec_canal_1}\n"); _logger.RegistrarCampo("Frecuencia Rx", frec_canal_1);
+                    }
                     if (canal2)
-                        _log($"Canal Tx: {frec_canal_2}\n");
+                    {
+                        _log($"Canal Tx: {frec_canal_2}\n"); _logger.RegistrarCampo("Canal Tx", frec_canal_2);
+                    }
                     else
-                        _log($"Frecuencia Tx: {frec_canal_2}\n");
+                    {
+                        _log($"Frecuencia Tx: {frec_canal_2}\n"); _logger.RegistrarCampo("Frecuencia Tx", frec_canal_2);
+                    }
                 }
-                _log($"{ack}\n");
+                _log($"{ack}\n"); _logger.RegistrarCampo("ACK", ack);
             }
         }
 
@@ -610,13 +657,13 @@ namespace Dem_v2
             sig_comunicaciones = mensaje[30];
             ack = General.ACK(mensaje[32]);
 
-            _log($"Formato: {FormatSpecifier.Formato(format)}\n");
-            _log($"MMSI: {mmsi}\n");
-            _log($"Tipo de Emergencia: {tipoEmergencia}\n");
-            _log($"Coordenadas: {Geografica.Posicion(coords)}\n");
-            _log($"UTC: {utc}\n");
-            _log($"Siguiente Comunicación: {Socorro.PosteriorCom(sig_comunicaciones)}\n");
-            _log($"{ack}\n");
+            _log($"Formato: {FormatSpecifier.Formato(format)}\n"); _logger.RegistrarCampo("Formato", FormatSpecifier.Formato(format));
+            _log($"MMSI: {mmsi}\n"); _logger.RegistrarCampo("MMSI", mmsi);
+            _log($"Tipo de Emergencia: {tipoEmergencia}\n"); _logger.RegistrarCampo("Tipo de Emergencia", tipoEmergencia);
+            _log($"Coordenadas: {Geografica.Posicion(coords)}\n"); _logger.RegistrarCampo("Coordenadas", Geografica.Posicion(coords));
+            _log($"UTC: {utc}\n"); _logger.RegistrarCampo("UTC", utc);
+            _log($"Siguiente Comunicación: {Socorro.PosteriorCom(sig_comunicaciones)}\n"); _logger.RegistrarCampo("Siguiente Comunicación", Socorro.PosteriorCom(sig_comunicaciones));
+            _log($"{ack}\n"); _logger.RegistrarCampo("ACK", ack);
 
             List<int> respuesta = mensaje.GetRange(4, 28);
             return respuesta;
@@ -668,26 +715,26 @@ namespace Dem_v2
             }
 
 
-            _log($"Formato: {FormatSpecifier.Formato(format)}\n");
-            _log($"MMSI: {mmsi}\n");
-            _log($"Categoría: {categoria}\n");
-            _log($"MMSI Transmisor: {mmsi_tx}\n");
-            _log($"Primer Telemando: {primer_tel}\n");
+            _log($"Formato: {FormatSpecifier.Formato(format)}\n"); _logger.RegistrarCampo("Formato", FormatSpecifier.Formato(format));
+            _log($"MMSI: {mmsi}\n"); _logger.RegistrarCampo("MMSI", mmsi);
+            _log($"Categoría: {categoria}\n"); _logger.RegistrarCampo("Categoría", categoria);
+            _log($"MMSI Transmisor: {mmsi_tx}\n"); _logger.RegistrarCampo("MMSI Transmisor", mmsi_tx);
+            _log($"Primer Telemando: {primer_tel}\n"); _logger.RegistrarCampo("Primer Telemando", primer_tel);
 
             if (mensaje[14] == 112)
             {
-                _log($"MMSI Socorro: {mmsi_socorro}\n");
-                _log($"Tipo de emergencia: {tipoEmergencia}\n");
-                _log($"Coordenadas: {coordenadas}\n");
-                _log($"UTC: {utc}\n");
-                _log($"Siguiente Comunicación: {sig_comunicaciones}\n");
-                _log($"{ack}\n");
+                _log($"MMSI Socorro: {mmsi_socorro}\n"); _logger.RegistrarCampo("MMSI Socorro", mmsi_socorro);
+                _log($"Tipo de emergencia: {tipoEmergencia}\n"); _logger.RegistrarCampo("Tipo de emergencia", tipoEmergencia);
+                _log($"Coordenadas: {coordenadas}\n"); _logger.RegistrarCampo("Coordenadas", coordenadas);
+                _log($"UTC: {utc}\n"); _logger.RegistrarCampo("UTC", utc);
+                _log($"Siguiente Comunicación: {sig_comunicaciones}\n"); _logger.RegistrarCampo("Siguiente Comunicación", sig_comunicaciones);
+                _log($"{ack}\n"); _logger.RegistrarCampo("ACK", ack);
             }
             else
             {
-                _log($"Segundo Telemando: {segundo_tel}\n");
-                _log($"Frecuencia: {frec_canal_1}\n");
-                _log($"{ack}\n");
+                _log($"Segundo Telemando: {segundo_tel}\n"); _logger.RegistrarCampo("Segundo Telemando", segundo_tel);
+                _log($"Frecuencia: {frec_canal_1}\n"); _logger.RegistrarCampo("Frecuencia", frec_canal_1);
+                _log($"{ack}\n"); _logger.RegistrarCampo("ACK", ack);
             }
         }
 
@@ -747,32 +794,40 @@ namespace Dem_v2
             }
 
 
-            _log($"Formato: {FormatSpecifier.Formato(format)}\n");
-            _log($"MMSI: {mmsi}\n");
-            _log($"Categoría: {categoria}\n");
-            _log($"Primer Telemando: {primer_tel}\n");
+            _log($"Formato: {FormatSpecifier.Formato(format)}\n"); _logger.RegistrarCampo("Formato", FormatSpecifier.Formato(format));
+            _log($"MMSI: {mmsi}\n"); _logger.RegistrarCampo("MMSI", mmsi);
+            _log($"Categoría: {categoria}\n"); _logger.RegistrarCampo("Categoría", categoria);
+            _log($"Primer Telemando: {primer_tel}\n"); _logger.RegistrarCampo("Primer Telemando", primer_tel);
 
             if (mensaje[4] == 112)
             {
-                _log($"MMSI Socorro: {mmsi_socorro}\n");
-                _log($"Tipo de emergencia: {tipoEmergencia}\n");
-                _log($"Coordenadas: {coordenadas}\n");
-                _log($"UTC: {utc}\n");
-                _log($"Siguiente Comunicación: {sig_comunicaciones}\n");
-                _log($"{ack}\n");
+                _log($"MMSI Socorro: {mmsi_socorro}\n"); _logger.RegistrarCampo("MMSI Socorro", mmsi_socorro);
+                _log($"Tipo de emergencia: {tipoEmergencia}\n"); _logger.RegistrarCampo("Tipo de emergencia", tipoEmergencia);
+                _log($"Coordenadas: {coordenadas}\n"); _logger.RegistrarCampo("Coordenadas", coordenadas);
+                _log($"UTC: {utc}\n"); _logger.RegistrarCampo("UTC", utc);
+                _log($"Siguiente Comunicación: {sig_comunicaciones}\n"); _logger.RegistrarCampo("Siguiente Comunicación", sig_comunicaciones);
+                _log($"{ack}\n"); _logger.RegistrarCampo("ACK", ack);
             }
             else
             {
-                _log($"Segundo Telemando: {segundo_tel}\n");
+                _log($"Segundo Telemando: {segundo_tel}\n"); _logger.RegistrarCampo("Segundo Telemando", segundo_tel);
                 if (canal)
-                    _log($"Canal Rx: {frec_canal_1}\n");
+                {
+                    _log($"Canal Rx: {frec_canal_1}\n"); _logger.RegistrarCampo("Canal Rx", frec_canal_1);
+                }
                 else
-                    _log($"Frecuencia Rx: {frec_canal_1}\n");
+                {
+                    _log($"Frecuencia Rx: {frec_canal_1}\n"); _logger.RegistrarCampo("Frecuencia Rx", frec_canal_1);
+                }
                 if (canal2)
-                    _log($"Canal Tx: {frec_canal_2}\n");
+                {
+                    _log($"Canal Tx: {frec_canal_2}\n"); _logger.RegistrarCampo("Canal Tx", frec_canal_2);
+                }
                 else
-                    _log($"Frecuencia Tx: {frec_canal_2}\n");
-                _log($"{ack}\n");
+                {
+                    _log($"Frecuencia Tx: {frec_canal_2}\n"); _logger.RegistrarCampo("Frecuencia Tx", frec_canal_2);
+                }
+                 _log($"{ack}\n"); _logger.RegistrarCampo("ACK", ack);
             }
         }
     }
@@ -780,10 +835,12 @@ namespace Dem_v2
     public class Expansion
     {
         private readonly Action<string> _log;
+        private readonly DisplayLogger _logger;
 
-        public Expansion(Action<string> logCallback)
+        public Expansion(Action<string> logCallback, DisplayLogger logger)
         {
             _log = logCallback ?? throw new ArgumentNullException(nameof(logCallback));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         public void Decodificar(List<int> EXTENSION)

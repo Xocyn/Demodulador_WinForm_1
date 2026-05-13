@@ -126,19 +126,11 @@ namespace Demodulador_WinForm_1.Migrado
 
                 // ── Nombre de archivo ─────────────────────────────────────────────
                 // Incluye milisegundos para evitar colisiones si llegan mensajes juntos.
-                string nombreArchivo = $"DSC_{ahora:ddMMyyyy_HHmmss_fff}_{SanitizarFormato(formato)}.txt";
+                string nombreArchivo = $"DSC_{ahora:dd_MM_yyyy_HH_mm_ss}_{SanitizarFormato(formato)}.txt";
                 string rutaCompleta = Path.Combine(CarpetaBase, nombreArchivo);
 
                 // ── Contenido ─────────────────────────────────────────────────────
                 var sb = new StringBuilder();
-
-                sb.AppendLine($"╔═══════════════════════════════════════════════════════╗");
-                sb.AppendLine($"║        MENSAJE DSC - {DateTime.Now:dd/MM/yyyy HH:mm:ss.fff}        ║");
-                sb.AppendLine($"╚═══════════════════════════════════════════════════════╝");
-                sb.AppendLine();
-                sb.AppendLine($"Formato: {formato}");
-                sb.AppendLine($"─────────────────────────────────────────────────────────");
-                sb.AppendLine();
 
                 foreach (var (clave, valor) in campos)
                     sb.AppendLine($"{clave,-25}: {valor}");

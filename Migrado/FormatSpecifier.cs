@@ -14,10 +14,24 @@ namespace Dem_v2
                 112 => "Socorro (112)",
                 116 => "AllShips (116)",
                 114 => "Llama a grupo de barcos (114)",
-                120 => "LLamada Individual (120)",
-                102 => "LLamada a Area Geografica (102)",
-                123 => "Individual 2 (123)",
+                120 => "Llamada Individual (120)",
+                102 => "Llamada a Area Geografica (102)",
+                123 => "Automática (123)",
                 _ => "Valor no reconocido" // Caso por defecto
+            };
+        }
+
+        public static string titulo(int valor)
+        {
+            return valor switch
+            {
+                112 => "SOCORRO",
+                116 => "ALLSHIPS",
+                114 => "GRUPO",
+                120 => "INDIVIDUAL",
+                102 => "AREA_GEOGRAFICA",
+                123 => "AUTOMÁTICA",
+                _ => "NO_IDENTIFICADO"// Caso por defecto
             };
         }
 
