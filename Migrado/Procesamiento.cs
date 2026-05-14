@@ -1,9 +1,12 @@
+using Demodulador_WinForm_1;
 using Demodulador_WinForm_1.Migrado;
 using MathNet.Numerics;
+using MathNet.Numerics.Providers.LinearAlgebra;
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
+using System.Security.Permissions;
 using System.Text;
 using System.Windows.Forms;
 using static System.Windows.Forms.DataFormats;
@@ -26,18 +29,19 @@ namespace Dem_v2
         private readonly DisplayLogger _logger;
         private readonly Metodos _metodos;
         private readonly Expansion _expansion;
+        private readonly Demodulador_DSC _form;
 
-        public Procesamiento(RichTextBox mainDisplay)
+        public Procesamiento(RichTextBox mainDisplay, Demodulador_DSC form = null)
         {
             _mainDisplay = mainDisplay;
             _logger = new DisplayLogger(mainDisplay);
+            _form = form;
 
             // Pasar DisplayLogger y LogToDisplay a Metodos y Expansion
             // DisplayLogger permite acceso a RegistrarCampo(), EstablecerFormato(), etc.
             _metodos = new Metodos(LogToDisplay, _logger);
             _expansion = new Expansion(LogToDisplay, _logger);
         }
-
         /// <summary>
         /// Método helper que escribe en el MAINDISPLAY de forma thread-safe.
         /// Detecta si estamos en el thread de UI y usa Invoke() si es necesario.
@@ -72,7 +76,7 @@ namespace Dem_v2
         /// Procesa una cadena de bits decodificada en un mensaje DSC.
         /// Este es el método principal que ejecuta toda la lógica de decodificación.
         /// </summary>
-        public void Procesar(string input, bool ext)
+        public void Procesar(string input)
         {
             try
             {
@@ -148,6 +152,7 @@ namespace Dem_v2
                 bool extension = false; bool ecc_ext = false;
 
                 List<Mensaje> HISTORIAL = new List<Mensaje>(); // Almaceno mensajes para posibles respuestas o procesamientos posteriores
+                Mensaje MSG = new Mensaje();
 
                 // ── Fase 4: Extension?  -────────-──────────────────────────────────
 
@@ -235,48 +240,41 @@ namespace Dem_v2
 
                 switch (MENSAJE[0])
                 {
-                    case 102:
-                        _metodos.MGeografica(MENSAJE);
+                    case 102: 
+                        MSG = _metodos.MGeografica(MENSAJE);
                         break;
+
                     case 112:
-                        datos_respuesta = _metodos.MSocorro(MENSAJE);
-
-                        Mensaje Socorro = new Mensaje()
-                        {
-                            Mensaje_List = MENSAJE,
-                            necesita_respuesta = true,
-                            Fecha_recepcion = DateTime.Now,
-                            data_respuesta = datos_respuesta,
-                            Formato = 112,
-                            extension = extension,
-                            Mensaje_ext = MENSAJE_EXT
-                        };
-
-                        //if (MostrarMenuSocorro())
-                        //{
-                        //    // TODO: Implementar respuesta automática
-                        //    // Respuesta.RespuestaSocorro(datos_respuesta);
-                        //    LogToDisplay("Preparando respuesta de socorro...\n");
-                        //}
+                        MSG = _metodos.MSocorro(MENSAJE);
+                        MSG.ack = "RESPONDER";
                         break;
+
                     case 114:
-                        _metodos.MGrupos(MENSAJE); 
+                        MSG = _metodos.MGrupos(MENSAJE);
                         break;
+
                     case 116:
-                        _metodos.MAllShips(MENSAJE);  
+                        MSG = _metodos.MAllShips(MENSAJE);
                         break;
+
                     case 120:
-                        _metodos.MIndividual(MENSAJE);
+                        MSG = _metodos.MIndividual(MENSAJE);
                         break;
+
                     case 123:
                         LogToDisplay("Formato 123 detectado (no implementado)\n");
                         break;
+
                     default:
                         LogToDisplay($"Formato desconocido: {MENSAJE[0]}\n");
                         break;
                 }
 
                 LogToDisplay("\n");
+
+                _form.AgregarFila(formatoMensaje, MSG.Fecha_recepcion.ToString("HH:mm:ss"), "CHECK", MSG.ack);
+                HISTORIAL.Insert(0, MSG); // Guardo el mensaje procesado en el historial para posibles respuestas o referencias futuras
+                // lo hago en la posición 0 para poder trabajar luego con las filas del DataGridView y relacionarlas con el historial de mensajes
 
                 // ── Fase 6: Procesamiento extension ────────────────────────────────
 
@@ -376,7 +374,7 @@ namespace Dem_v2
         }
 
         // ── GEOGRAFICA─────────────────────────────────────────────────────
-        public void MGeografica(List<int> mensaje)
+        public Mensaje MGeografica(List<int> mensaje)
         {
             string mmsi = string.Empty;
             string area = string.Empty;
@@ -485,10 +483,18 @@ namespace Dem_v2
                 _log($"ACK: {ack}\n");
                 _logger.RegistrarCampo("ACK", ack);
             }
+            Mensaje GEO = new Mensaje()
+            {
+                Mensaje_List = mensaje,
+                Fecha_recepcion = DateTime.Now,
+                Formato = 102,
+                ack = ack,
+            };
+            return GEO;
         }
 
         // ── INDIVIDUAL────────────────────────────────────────────────────
-        public void MIndividual(List<int> mensaje)
+        public Mensaje MIndividual(List<int> mensaje)
         {
             int format = mensaje[0];
             string mmsi_receptor, mmsi_transmisor = string.Empty;
@@ -621,10 +627,18 @@ namespace Dem_v2
                 }
                 _log($"{ack}\n"); _logger.RegistrarCampo("ACK", ack);
             }
+            Mensaje IND= new Mensaje()
+            {
+                Mensaje_List = mensaje,
+                Fecha_recepcion = DateTime.Now,
+                Formato = 120,
+                ack = ack,
+            };
+            return IND;
         }
 
         // ── SOCORRO ─────────────────────────────────────────────────────
-        public List<int> MSocorro(List<int> mensaje)
+        public Mensaje MSocorro(List<int> mensaje)
         {
             int format = 0;
             string mmsi = string.Empty;
@@ -634,11 +648,12 @@ namespace Dem_v2
             string utc = string.Empty;
             int sig_comunicaciones = 0;
             string ack = string.Empty;
+            Mensaje SOC = new Mensaje();
 
             if (mensaje[0] == mensaje[2])
                 format = mensaje[0];
             else
-                return new List<int>();
+                return SOC;
 
             mmsi = General.newMMSI(mensaje, 4);
             tipoEmergencia = Socorro.Peligro(mensaje[14]);
@@ -666,11 +681,20 @@ namespace Dem_v2
             _log($"{ack}\n"); _logger.RegistrarCampo("ACK", ack);
 
             List<int> respuesta = mensaje.GetRange(4, 28);
-            return respuesta;
+
+            Mensaje SOC_2 = new Mensaje
+            {
+                Mensaje_List = mensaje,
+                Fecha_recepcion = DateTime.Now,
+                data_respuesta = respuesta,
+                Formato = 112,
+                ack = ack,
+            };
+            return SOC_2;
         }
 
         // ── GRUPOS ─────────────────────────────────────────────────────
-        public void MGrupos(List<int> mensaje)
+        public Mensaje MGrupos(List<int> mensaje)
         {
             int format = mensaje[0];
             string mmsi = string.Empty;
@@ -736,10 +760,19 @@ namespace Dem_v2
                 _log($"Frecuencia: {frec_canal_1}\n"); _logger.RegistrarCampo("Frecuencia", frec_canal_1);
                 _log($"{ack}\n"); _logger.RegistrarCampo("ACK", ack);
             }
+
+            Mensaje GRUP = new Mensaje
+            {
+                Mensaje_List = mensaje,
+                Fecha_recepcion = DateTime.Now,
+                Formato = 114,
+                ack = ack,
+            };
+            return GRUP;
         }
 
         // ── ALL SHIPS─────────────────────────────────────────────────────
-        public void MAllShips(List<int> mensaje)
+        public Mensaje MAllShips(List<int> mensaje)
         {
             int format = mensaje[0];
             string mmsi = string.Empty;
@@ -829,6 +862,15 @@ namespace Dem_v2
                 }
                  _log($"{ack}\n"); _logger.RegistrarCampo("ACK", ack);
             }
+
+            Mensaje ALL = new Mensaje
+            {
+                Mensaje_List = mensaje,
+                Fecha_recepcion = DateTime.Now,
+                Formato = 116,
+                ack = ack,
+            };
+            return ALL;
         }
     }
 
@@ -1276,11 +1318,11 @@ namespace Dem_v2
     {
         public List<int>? Mensaje_List { get; set; } // Acepta NULLs
         public DateTime Fecha_recepcion { get; set; }
-        public bool necesita_respuesta { get; set; }
-        public List<int>? data_respuesta { get; set; }
+        public string ack { get; set; } = string.Empty;
+        public List<int> ? data_respuesta { get; set; }
         public int Formato { get; set; }
-        public bool extension { get; set; } 
-        public List<int>? Mensaje_ext { get; set; }
+        public bool ? extension { get; set; } 
+        public List<int> ? Mensaje_ext { get; set; }
     }
    
 }

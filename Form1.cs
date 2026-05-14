@@ -1,3 +1,4 @@
+using Dem_v2;
 using NAudio.Wave;
 
 namespace Demodulador_WinForm_1
@@ -6,10 +7,18 @@ namespace Demodulador_WinForm_1
     {
         private CapturaDatos _capturaDatos;
         private bool _isCapturing = false;
-
+        private readonly Procesamiento _procesamiento;
         public Demodulador_DSC()
         {
             InitializeComponent();
+
+            _procesamiento = new Procesamiento(MAINDISPLAY, this);
+
+            //this.WindowState = FormWindowState.Maximized;
+            dataGridView1.AllowUserToAddRows = false;
+            dataGridView1.RowHeadersVisible = false;
+            dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+
             _capturaDatos = new CapturaDatos(this);
 
             for (int i = 0; i < WaveInEvent.DeviceCount; i++)
@@ -63,6 +72,35 @@ namespace Demodulador_WinForm_1
         private void splitContainer1_Panel2_Paint(object sender, PaintEventArgs e)
         {
 
+        }
+
+        /// <summary>
+        /// Agrega una fila a la tabla de forma thread-safe.
+        /// Detecta si estamos en el thread de UI y usa Invoke() si es necesario.
+        /// </summary>
+        public void AgregarFila(string formato, string hora, string ecc, string rta)
+        {
+            if (dataGridView1.InvokeRequired)
+            {
+                // Estamos en un thread diferente, usar Invoke para actualizar UI
+                this.Invoke(() => AgregarFila(formato, hora, ecc, rta));
+            }
+            else
+            {
+                // Estamos en el thread de UI, actualizar directamente
+                dataGridView1.Rows.Insert(0, formato, hora, ecc, rta);
+            }
+        }
+
+        private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0)
+            {
+                if (dataGridView1.Columns[e.ColumnIndex].Name == "see_msg")
+                {
+                    MessageBox.Show("Botón presionado");
+                }
+            }
         }
     }
 }

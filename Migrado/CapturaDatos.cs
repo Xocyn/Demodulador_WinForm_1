@@ -181,7 +181,7 @@ namespace Demodulador_WinForm_1
             _demod = new BFSKDemodulator(vhfMode);
 
             // Instanciar Procesamiento con referencias a los controles del formulario
-            var procesamiento = new Procesamiento(_form.MAINDISPLAY);
+            var procesamiento = new Procesamiento(_form.MAINDISPLAY, _form);
 
             // ── Inicializar visualización de onda ────────────────────────────────────
             // Crear callback que actualice el waveViewer1 de forma thread-safe
@@ -209,8 +209,7 @@ namespace Demodulador_WinForm_1
             StringBuilder bitAccumulator = new StringBuilder();
 
             const string startPattern = "01010101010101010101"; // 20 bits
-            bool extensionDetected = false;
-
+          
             Estado estado = Estado.EsperandoInicio;
             int cooldownMs = 250;
             DateTime cooldownHasta = DateTime.MinValue;
@@ -238,8 +237,7 @@ namespace Demodulador_WinForm_1
                     {
                         try
                         {
-                            procesamiento.Procesar(bits, extensionDetected);
-                            extensionDetected = false;
+                            procesamiento.Procesar(bits);
                         }
                         catch (Exception ex)
                         {
