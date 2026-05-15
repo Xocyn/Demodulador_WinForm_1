@@ -1,5 +1,7 @@
 using Dem_v2;
+using Demodulador_WinForm_1.Ventana_new;
 using NAudio.Wave;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace Demodulador_WinForm_1
 {
@@ -19,7 +21,7 @@ namespace Demodulador_WinForm_1
             dataGridView1.RowHeadersVisible = false;
             dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
 
-            _capturaDatos = new CapturaDatos(this);
+            _capturaDatos = new CapturaDatos(this, _procesamiento);
 
             for (int i = 0; i < WaveInEvent.DeviceCount; i++)
             {
@@ -92,15 +94,51 @@ namespace Demodulador_WinForm_1
             }
         }
 
+        //private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        //{
+        //    if (e.RowIndex < 0) return;
+
+        //    // Forzar que el DataGridView registre el click en botones
+        //    dataGridView1.CommitEdit(DataGridViewDataErrorContexts.Commit);
+
+        //    Mensaje msg = null;
+        //    lock (_procesamiento.HistorialLock)
+        //    {
+        //        if (e.RowIndex < _procesamiento.HISTORIAL.Count)
+        //            msg = _procesamiento.HISTORIAL[e.RowIndex];
+        //    }
+
+        //    if (msg == null) return;
+
+        //    if (dataGridView1.Columns[e.ColumnIndex].Name == "see_msg")
+        //    {
+        //        MessageBox.Show($"Formato: {msg.Formato}\nFecha: {msg.Fecha_recepcion}\nACK: {msg.ack}");
+        //    }
+        //    else if (dataGridView1.Columns[e.ColumnIndex].Name == "rta_msg")
+        //    {
+        //        // lógica de respuesta
+        //    }
+        //}
         private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
-            if (e.RowIndex >= 0)
+            if (e.RowIndex < 0) return;
+
+            Mensaje msg = null;
+            lock (_procesamiento.HistorialLock)
             {
-                if (dataGridView1.Columns[e.ColumnIndex].Name == "see_msg")
-                {
-                    MessageBox.Show("Botón presionado");
-                }
+                if (e.RowIndex < _procesamiento.HISTORIAL.Count)
+                    msg = _procesamiento.HISTORIAL[e.RowIndex];
+            }
+
+            if (msg == null) return;
+
+            if (dataGridView1.Columns[e.ColumnIndex].Name == "see_msg")
+            {
+                var ventana = new ventana_mensaje(msg);
+                ventana.Show();
             }
         }
     }
+
 }
+

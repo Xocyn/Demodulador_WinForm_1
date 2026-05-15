@@ -30,6 +30,9 @@ namespace Dem_v2
         private readonly Metodos _metodos;
         private readonly Expansion _expansion;
         private readonly Demodulador_DSC _form;
+        public List<Mensaje> HISTORIAL { get; } = new List<Mensaje>();
+        public readonly object HistorialLock = new object();
+
 
         public Procesamiento(RichTextBox mainDisplay, Demodulador_DSC form = null)
         {
@@ -151,7 +154,7 @@ namespace Dem_v2
                 List<int> MENSAJE_OG = new();
                 bool extension = false; bool ecc_ext = false;
 
-                List<Mensaje> HISTORIAL = new List<Mensaje>(); // Almaceno mensajes para posibles respuestas o procesamientos posteriores
+                //List<Mensaje> HISTORIAL = new List<Mensaje>(); // Almaceno mensajes para posibles respuestas o procesamientos posteriores
                 Mensaje MSG = new Mensaje();
 
                 // ── Fase 4: Extension?  -────────-──────────────────────────────────
@@ -273,7 +276,12 @@ namespace Dem_v2
                 LogToDisplay("\n");
 
                 _form.AgregarFila(formatoMensaje, MSG.Fecha_recepcion.ToString("HH:mm:ss"), "CHECK", MSG.ack);
-                HISTORIAL.Insert(0, MSG); // Guardo el mensaje procesado en el historial para posibles respuestas o referencias futuras
+
+                lock (HistorialLock)
+                {
+                    HISTORIAL.Insert(0, MSG);
+                }
+                // Guardo el mensaje procesado en el historial para posibles respuestas o referencias futuras
                 // lo hago en la posición 0 para poder trabajar luego con las filas del DataGridView y relacionarlas con el historial de mensajes
 
                 // ── Fase 6: Procesamiento extension ────────────────────────────────
@@ -1316,12 +1324,12 @@ namespace Dem_v2
 
     public class Mensaje
     {
-        public List<int>? Mensaje_List { get; set; } // Acepta NULLs
+        public List<int> Mensaje_List { get; set; } 
         public DateTime Fecha_recepcion { get; set; }
         public string ack { get; set; } = string.Empty;
-        public List<int> ? data_respuesta { get; set; }
+        public List<int> ? data_respuesta { get; set; } // Acepta NULLs
         public int Formato { get; set; }
-        public bool ? extension { get; set; } 
+        public bool ? extension { get; set; } // Acepta NULLs
         public List<int> ? Mensaje_ext { get; set; }
     }
    

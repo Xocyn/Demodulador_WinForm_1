@@ -40,12 +40,13 @@ namespace Demodulador_WinForm_1
         private Thread _processingThread;
         private bool _isRunning = false;
         private WaveDisplayManager _waveDisplayManager;
+        private readonly Procesamiento _procesamiento;  // ← agregar campo
 
-        public CapturaDatos(Demodulador_DSC form)
+        public CapturaDatos(Demodulador_DSC form, Procesamiento procesamiento)  // ← agregar parámetro
         {
             _form = form;
+            _procesamiento = procesamiento;  // ← guardar referencia
         }
-
         private void LogToDisplay(string message)
         {
             if (_form?.InvokeRequired == true)
@@ -181,7 +182,8 @@ namespace Demodulador_WinForm_1
             _demod = new BFSKDemodulator(vhfMode);
 
             // Instanciar Procesamiento con referencias a los controles del formulario
-            var procesamiento = new Procesamiento(_form.MAINDISPLAY, _form);
+            //var procesamiento = new Procesamiento(_form.MAINDISPLAY, _form);
+
 
             // ── Inicializar visualización de onda ────────────────────────────────────
             // Crear callback que actualice el waveViewer1 de forma thread-safe
@@ -237,7 +239,7 @@ namespace Demodulador_WinForm_1
                     {
                         try
                         {
-                            procesamiento.Procesar(bits);
+                            _procesamiento.Procesar(bits);
                         }
                         catch (Exception ex)
                         {

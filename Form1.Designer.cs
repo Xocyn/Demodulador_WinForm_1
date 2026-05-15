@@ -53,7 +53,7 @@
             // label_banda
             // 
             label_banda.AutoSize = true;
-            label_banda.Location = new Point(26, 27);
+            label_banda.Location = new Point(42, 56);
             label_banda.Name = "label_banda";
             label_banda.Size = new Size(127, 20);
             label_banda.TabIndex = 0;
@@ -63,7 +63,7 @@
             // 
             combox_hf_vhf.FormattingEnabled = true;
             combox_hf_vhf.Items.AddRange(new object[] { "MF/HF", "VHF" });
-            combox_hf_vhf.Location = new Point(167, 26);
+            combox_hf_vhf.Location = new Point(183, 55);
             combox_hf_vhf.Name = "combox_hf_vhf";
             combox_hf_vhf.Size = new Size(115, 28);
             combox_hf_vhf.TabIndex = 1;
@@ -72,7 +72,7 @@
             // dispositivos
             // 
             dispositivos.AutoSize = true;
-            dispositivos.Location = new Point(26, 71);
+            dispositivos.Location = new Point(42, 100);
             dispositivos.Name = "dispositivos";
             dispositivos.Size = new Size(174, 20);
             dispositivos.TabIndex = 2;
@@ -81,7 +81,7 @@
             // combox_dispositivos
             // 
             combox_dispositivos.FormattingEnabled = true;
-            combox_dispositivos.Location = new Point(206, 68);
+            combox_dispositivos.Location = new Point(222, 97);
             combox_dispositivos.Name = "combox_dispositivos";
             combox_dispositivos.Size = new Size(245, 28);
             combox_dispositivos.TabIndex = 3;
@@ -89,7 +89,7 @@
             // 
             // splitContainer1
             // 
-            splitContainer1.Location = new Point(443, 139);
+            splitContainer1.Location = new Point(446, 211);
             splitContainer1.Name = "splitContainer1";
             // 
             // splitContainer1.Panel1
@@ -113,7 +113,7 @@
             // 
             // MAINDISPLAY
             // 
-            MAINDISPLAY.Location = new Point(3, 3);
+            MAINDISPLAY.Location = new Point(-1, 0);
             MAINDISPLAY.Name = "MAINDISPLAY";
             MAINDISPLAY.Size = new Size(649, 411);
             MAINDISPLAY.TabIndex = 0;
@@ -123,10 +123,10 @@
             // 
             waveViewer1.BackColor = Color.Black;
             waveViewer1.ForeColor = Color.Lime;
-            waveViewer1.Location = new Point(692, 9);
+            waveViewer1.Location = new Point(496, 9);
             waveViewer1.Margin = new Padding(0);
             waveViewer1.Name = "waveViewer1";
-            waveViewer1.Size = new Size(1130, 100);
+            waveViewer1.Size = new Size(1419, 157);
             waveViewer1.TabIndex = 5;
             // 
             // dataGridView1
@@ -137,7 +137,7 @@
             dataGridView1.AllowUserToResizeRows = false;
             dataGridView1.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
             dataGridView1.Columns.AddRange(new DataGridViewColumn[] { columna_formato, columna_hora, column_ecc, columna_rta, see_msg, rta_msg });
-            dataGridView1.Location = new Point(446, 594);
+            dataGridView1.Location = new Point(446, 666);
             dataGridView1.Name = "dataGridView1";
             dataGridView1.RowHeadersWidth = 51;
             dataGridView1.Size = new Size(978, 188);
@@ -154,7 +154,7 @@
             // 
             // columna_hora
             // 
-            columna_hora.HeaderText = "Fecha / Hora";
+            columna_hora.HeaderText = "Hora";
             columna_hora.MinimumWidth = 6;
             columna_hora.Name = "columna_hora";
             columna_hora.ReadOnly = true;
@@ -196,7 +196,7 @@
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1831, 929);
+            ClientSize = new Size(1924, 966);
             Controls.Add(dataGridView1);
             Controls.Add(waveViewer1);
             Controls.Add(splitContainer1);

@@ -17,4 +17,8 @@
     <PackageReference Include="NAudio" Version="2.3.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Ventana_new\Documentacion\" />
+  </ItemGroup>
+
 </Project>
