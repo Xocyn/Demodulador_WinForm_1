@@ -15,7 +15,7 @@ namespace Demodulador_WinForm_1.Ventana_new
         private readonly Metodos _metodos;
         private readonly Mensaje _mensaje;
         private readonly DisplayLogger _logger;
-
+        private readonly Expansion _expansion;
         public ventana_mensaje(Mensaje msg)
         {
             InitializeComponent();
@@ -26,6 +26,8 @@ namespace Demodulador_WinForm_1.Ventana_new
 
             // Pasar LogToDisplay y DisplayLogger a Metodos
             _metodos = new Metodos(LogToDisplay, _logger);
+
+            _expansion = new Expansion(LogToDisplay, _logger);
 
             if (_mensaje != null)
             {
@@ -61,6 +63,11 @@ namespace Demodulador_WinForm_1.Ventana_new
                 }
 
                 LogToDisplay("\n");
+
+                if (msg.extension && msg.Mensaje_ext != null)
+                {
+                    _expansion.Decodificar(msg.Mensaje_ext); // NO ME DEJA DECOFICIAR
+                }
             }
         }
 

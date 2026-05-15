@@ -276,6 +276,9 @@ namespace Dem_v2
                 LogToDisplay("\n");
 
                 _form.AgregarFila(formatoMensaje, MSG.Fecha_recepcion.ToString("HH:mm:ss"), "CHECK", MSG.ack);
+                MSG.extension = extension;
+                List<int> M_E_M = MENSAJE_EXT.ToList(); 
+                MSG.Mensaje_ext = (extension && ecc_ext) ? M_E_M : null;
 
                 lock (HistorialLock)
                 {
@@ -899,59 +902,61 @@ namespace Dem_v2
             string eos = string.Empty;
 
             _log("\n");
-            Geografica.EliminarPosicionesImpares(EXTENSION);
-            switch (EXTENSION[i])
+            List<int> extensionLocal = new List<int>(EXTENSION);
+
+            Geografica.EliminarPosicionesImpares(extensionLocal);
+            switch (extensionLocal[i])
             {
                 case 100:
                     //  Resolusion mejorada de la posicion
                     i++;
-                    i = res_mejorada(EXTENSION, i);
+                    i = res_mejorada(extensionLocal, i);
                     break;
                 case 101:
                     // Origen y punto de referencia de posicion 
                     i++;
-                    i = origen_punto_ref(EXTENSION, i);
+                    i = origen_punto_ref(extensionLocal, i);
                     break;
                 case 102:
                     // Velocidad actual del barco
                     i++;
-                    i = velocidad_actual(EXTENSION, i);
+                    i = velocidad_actual(extensionLocal, i);
                     break;
                 case 103:
                     // Ruta actual del barco
                     i++;
-                    i = ruta_actual(EXTENSION, i);
+                    i = ruta_actual(extensionLocal, i);
                     break;
                 case 104:
                     // Identificador adicional de la estacion
                     i++;
-                    i = identificador_adicional(EXTENSION, i);
+                    i = identificador_adicional(extensionLocal, i);
                     break;
                 case 105:
                     // Zona geofrafica ampliada
                     i++;
-                    i = zona_geografica_ampliada(EXTENSION, i);
+                    i = zona_geografica_ampliada(extensionLocal, i);
                     break;
                 case 106:
                     // Numero de personas a bordo
                     i++;
-                    i = numero_personas_a_bordo(EXTENSION, i);
+                    i = numero_personas_a_bordo(extensionLocal, i);
                     break;
                 default:
                     // No identificado
-                    _log("Caracter no identificado\n");
+                    _log("Caracter no identificado\n"); _logger.RegistrarCampo("Instrucción", "Caracter no identificado");
                     return;
 
             }
 
             // leer el caracter y si es EOS se va al final y sino es el Mensaje 2
-            int valor2 = EXTENSION[i];
+            int valor2 = extensionLocal[i];
 
             if (valor2 == 127 || valor2 == 122 || valor2 == 117)
             {
                 // EOS
                 eos = General.ACK(valor2);
-                _log(eos);
+                _log(eos); _logger.RegistrarCampo("EOS", eos);
                 return;
             }
             else
@@ -961,51 +966,51 @@ namespace Dem_v2
                     case 100:
                         //  Resolusion mejorada de la posicion
                         i++;
-                        i = res_mejorada(EXTENSION, i);
+                        i = res_mejorada(extensionLocal, i);
                         break;
                     case 101:
                         // Origen y punto de referencia de posicion 
                         i++;
-                        i = origen_punto_ref(EXTENSION, i);
+                        i = origen_punto_ref(extensionLocal, i);
                         break;
                     case 102:
                         // Velocidad actual del barco
                         i++;
-                        i = velocidad_actual(EXTENSION, i);
+                        i = velocidad_actual(extensionLocal, i);
                         break;
                     case 103:
                         // Ruta actual del barco
                         i++;
-                        i = ruta_actual(EXTENSION, i);
+                        i = ruta_actual(extensionLocal, i);
                         break;
                     case 104:
                         // Identificador adicional de la estacion
                         i++;
-                        i = identificador_adicional(EXTENSION, i);
+                        i = identificador_adicional(extensionLocal, i);
                         break;
                     case 105:
                         // Zona geofrafica ampliada
                         i++;
-                        i = zona_geografica_ampliada(EXTENSION, i);
+                        i = zona_geografica_ampliada(extensionLocal, i);
                         break;
                     case 106:
                         // Numero de personas a bordo
                         i++;
-                        i = numero_personas_a_bordo(EXTENSION, i);
+                        i = numero_personas_a_bordo(extensionLocal, i);
                         break;
                     default:
                         // No identificado
-                        _log("Caracter no identificado\n");
+                        _log("Caracter no identificado\n"); _logger.RegistrarCampo("Instrucción", "Caracter no identificado");
                         return;
                 }
             }
 
-            int valor3 = EXTENSION[i];
+            int valor3 = extensionLocal[i];
             if (valor3 == 127 || valor3 == 122 || valor3 == 117)
             {
                 // EOS
                 eos = General.ACK(valor3);
-                _log(eos);
+                _log(eos); _logger.RegistrarCampo("EOS", eos);
                 return;
             }
 
@@ -1020,13 +1025,13 @@ namespace Dem_v2
 
             if (EXT[i] == 110)
             {
-                _log("Peticion de datos\n");
+                _log("Peticion de datos\n"); _logger.RegistrarCampo("Instrucción","Peticion de datos");
                 return i + 1;
 
             }
             else if (EXT[i] == 126)
             {
-                _log("Ningun dato disponible\n");
+                _log("Ningun dato disponible\n"); _logger.RegistrarCampo("Instrucción","Ningun dato disponible");
                 return i + 1;
             }
 
@@ -1038,8 +1043,8 @@ namespace Dem_v2
 
             List<int> res_D = General.SplitDigits2(res_I);
 
-            _log($"Mejora de Latitud {res_D[0]}{res_D[1]}{res_D[2]}{res_D[3]}'' \n");
-            _log($"Mejora de Longitud {res_D[4]}{res_D[5]}{res_D[6]}{res_D[7]}'' \n");
+            _log($"Mejora de Latitud {res_D[0]}{res_D[1]}{res_D[2]}{res_D[3]}'' \n"); _logger.RegistrarCampo("Mejora de Latitud", $"{res_D[0]}{res_D[1]}{res_D[2]}{res_D[3]}''");
+            _log($"Mejora de Longitud {res_D[4]}{res_D[5]}{res_D[6]}{res_D[7]}'' \n"); _logger.RegistrarCampo("Mejora de Longitud", $"{res_D[4]}{res_D[5]}{res_D[6]}{res_D[7]}''");
 
             return i + 4;
         }
@@ -1050,12 +1055,12 @@ namespace Dem_v2
 
             if (EXT[i] == 110)
             {
-                _log("Peticion de datos\n");
+                _log("Peticion de datos\n"); _logger.RegistrarCampo("Instrucción", "Peticion de datos");
                 return i + 1;
             }
             else if (EXT[i] == 126)
             {
-                _log("Ningun dato disponible\n");
+                _log("Ningun dato disponible\n"); _logger.RegistrarCampo("Instrucción", "Ningun dato disponible");
                 return i + 1;
             }
 
@@ -1097,14 +1102,14 @@ namespace Dem_v2
                     break;
             }
 
-            int valor = EXT[i+1];
+            int valor = EXT[i + 1];
 
             List<int> presicion = valor
                 .ToString()
                 .Select(c => int.Parse(c.ToString()))
                 .ToList();
 
-            switch (EXT[i+2])
+            switch (EXT[i + 2])
             {
                 case 0:
                     punto_ref = "WGS-84";
@@ -1120,9 +1125,9 @@ namespace Dem_v2
                     break;
             }
 
-            _log($"Dato de posicion procedentes de: {dispositivo}\n");
-            _log($"Presicion del punto de referencia: {presicion[0]},{presicion[1]}\n");
-            _log($"Punto de referencia: {punto_ref}\n");
+            _log($"Dato de posicion procedentes de: {dispositivo}\n"); _logger.RegistrarCampo("Dispositivo", dispositivo);
+            _log($"Presicion del punto de referencia: {presicion[0]},{presicion[1]}\n"); _logger.RegistrarCampo("Presicion punto ref.", $"{presicion[0]},{presicion[1]}");
+            _log($"Punto de referencia: {punto_ref}\n"); _logger.RegistrarCampo("Punto de referencia", punto_ref);
             return i + 3;
         }
 
@@ -1132,12 +1137,12 @@ namespace Dem_v2
 
             if (EXT[i] == 110)
             {
-                _log("Peticion de datos\n");
+                _log("Peticion de datos\n"); _logger.RegistrarCampo("Instrucción", "Peticion de datos");
                 return i + 1;
             }
             else if (EXT[i] == 126)
             {
-                _log("Ningun dato disponible\n");
+                _log("Ningun dato disponible\n"); _logger.RegistrarCampo("Instrucción", "Ningun dato disponible");
                 return i + 1;
             }
 
@@ -1150,7 +1155,7 @@ namespace Dem_v2
             List<int> vel_d= General.SplitDigits2(vel_I);
 
 
-            _log($"Velocidad actual del barco: {vel_d[0]}{vel_d[1]}{vel_d[2]},{vel_d[3]} nudos\n");
+            _log($"Velocidad actual del barco: {vel_d[0]}{vel_d[1]}{vel_d[2]},{vel_d[3]} nudos\n"); _logger.RegistrarCampo("Velocidad del barco", $"{vel_d[0]}{vel_d[1]}{vel_d[2]},{vel_d[3]} nudos");
             return i + 2;
         }
 
@@ -1160,12 +1165,12 @@ namespace Dem_v2
 
             if (EXT[i] == 110)
             {
-                _log("Peticion de datos\n");
+                _log("Peticion de datos\n"); _logger.RegistrarCampo("Instrucción", "Peticion de datos");
                 return i + 1;
             }
             else if (EXT[i] == 126)
             {
-                _log("Ningun dato disponible\n");
+                _log("Ningun dato disponible\n"); _logger.RegistrarCampo("Instrucción", "Ningun dato disponible");
                 return i + 1;
             }
 
@@ -1177,7 +1182,7 @@ namespace Dem_v2
 
             List<int> ruta_d = General.SplitDigits2(ruta_I);
 
-            _log($"Ruta actual del barco: {ruta_d[0]}{ruta_d[1]}{ruta_d[2]},{ruta_d[3]} grados\n");
+            _log($"Ruta actual del barco: {ruta_d[0]}{ruta_d[1]}{ruta_d[2]},{ruta_d[3]} grados\n"); _logger.RegistrarCampo("Ruta actual del barco", $"{ruta_d[0]}{ruta_d[1]}{ruta_d[2]},{ruta_d[3]} grados");
             return i + 2;
         }
 
@@ -1186,12 +1191,12 @@ namespace Dem_v2
             // Se leen 10 caracteres (100 bits) y se decodifica un identificador adicional de la estacion
             if (EXT[i] == 110)
             {
-                _log("Peticion de datos\n");
+                _log("Peticion de datos\n"); _logger.RegistrarCampo("Instrucción", "Peticion de datos");
                 return i + 1;
             }
             else if (EXT[i] == 126)
             {
-                _log("Ningun dato disponible\n");
+                _log("Ningun dato disponible\n"); _logger.RegistrarCampo("Instrucción", "Ningun dato disponible");
                 return i + 1;
             }
 
@@ -1203,7 +1208,7 @@ namespace Dem_v2
                 new_id.Add(Caracter(i2));
             }
 
-            _log($"Identificador adicional: {string.Join("", new_id)}\n");
+            _log($"Identificador adicional: {string.Join("", new_id)}\n"); _logger.RegistrarCampo("Identificador adicional", string.Join("", new_id));
 
             return i + 10;
         }
@@ -1222,28 +1227,28 @@ namespace Dem_v2
 
             List<int> zona_d = General.SplitDigits2(zona_i);
 
-            _log($"Mejora de Latitud: ,{zona_d[0]}{zona_d[1]}{zona_d[2]}{zona_d[3]}'' \n");
-            _log($"Mejora de Longitud: ,{zona_d[4]}{zona_d[5]}{zona_d[6]}{zona_d[7]}'' \n");
+            _log($"Mejora de Latitud: ,{zona_d[0]}{zona_d[1]}{zona_d[2]}{zona_d[3]}'' \n"); _logger.RegistrarCampo("Mejora de Latitud", $"{zona_d[0]}{zona_d[1]}{zona_d[2]}{zona_d[3]}''");
+            _log($"Mejora de Longitud: ,{zona_d[4]}{zona_d[5]}{zona_d[6]}{zona_d[7]}'' \n"); _logger.RegistrarCampo("Mejora de Longitud", $"{zona_d[4]}{zona_d[5]}{zona_d[6]}{zona_d[7]}''");
 
-            _log($"Resolucion adicional ventana vertical: {zona_d[8]}{zona_d[9]}{zona_d[10]}{zona_d[11]}\n");
-            _log($"Resolucion adicional ventana horizontal: {zona_d[12]}{zona_d[13]}{zona_d[14]}{zona_d[15]}\n");
+            _log($"Resolución adicional ventana vertical: {zona_d[8]}{zona_d[9]}{zona_d[10]}{zona_d[11]}\n"); _logger.RegistrarCampo("Res. vertical", $"{zona_d[8]}{zona_d[9]}{zona_d[10]}{zona_d[11]}");
+            _log($"Resolución adicional ventana horizontal: {zona_d[12]}{zona_d[13]}{zona_d[14]}{zona_d[15]}\n"); _logger.RegistrarCampo("Res. horizontal", $"{zona_d[12]}{zona_d[13]}{zona_d[14]}{zona_d[15]}");
 
             if (zona_d[8] == 126 || zona_d[9] == 126)
             {
-                _log("No se dispone estimacion de velocidad\n");
+                _log("No se dispone estimacion de velocidad\n"); _logger.RegistrarCampo("Velocidad del barco", "No se dispone estimacion de velocidad");
             }
             else
             {
-                _log($"Velocidad actual del barco: {zona_d[16]}{zona_d[17]}{zona_d[18]},{zona_d[19]} nudos\n");
+                _log($"Velocidad actual del barco: {zona_d[16]}{zona_d[17]}{zona_d[18]},{zona_d[19]} nudos\n"); _logger.RegistrarCampo("Velocidad del barco", $"{zona_d[16]}{zona_d[17]}{zona_d[18]},{zona_d[19]} nudos");
             }
 
             if (zona_d[10] == 126 || zona_d[11] == 126)
             {
-                _log("No se dispone estimacion de trayectoria\n");
+                _log("No se dispone estimacion de trayectoria\n"); _logger.RegistrarCampo("Trayectoria del barco", "No se dispone estimacion de trayectoria");
             }
             else
             {
-                _log($"Trayectoria actual del barco: {zona_d[20]}{zona_d[21]}{zona_d[22]},{zona_d[23]} grados\n");
+                _log($"Trayectoria actual del barco: {zona_d[20]}{zona_d[21]}{zona_d[22]},{zona_d[23]} grados\n"); _logger.RegistrarCampo("Trayectoria del barco", $"{zona_d[20]}{zona_d[21]}{zona_d[22]},{zona_d[23]} grados"); 
             }
 
             return i + 12;
@@ -1254,19 +1259,19 @@ namespace Dem_v2
             // Se leen 2 caracteres (20 bits) y se decodifica el numero de personas a bordo
             if (EXT[i] == 110)
             {
-                _log("Peticion de datos\n");
+                _log("Peticion de datos\n"); _logger.RegistrarCampo("Instrucción", "Peticion de datos");
                 return i + 1;
             }
             else if (EXT[i] == 126)
             {
-                _log("Ningun dato disponible\n");
+                _log("Ningun dato disponible\n"); _logger.RegistrarCampo("Instrucción", "Ningun dato disponible");
                 return i + 1;
             }
 
             List<int> personas = EXT.GetRange(i, 2);
 
             string ppol = string.Join("", personas.Select(x => x.ToString("D2")));
-            _log($"Numero de personas a bordo: {ppol}\n");
+            _log($"Numero de personas a bordo: {ppol}\n"); _logger.RegistrarCampo("Personas a bordo", ppol);
 
             return i + 2;
         }
@@ -1329,7 +1334,7 @@ namespace Dem_v2
         public string ack { get; set; } = string.Empty;
         public List<int> ? data_respuesta { get; set; } // Acepta NULLs
         public int Formato { get; set; }
-        public bool ? extension { get; set; } // Acepta NULLs
+        public bool extension { get; set; } // Acepta NULLs
         public List<int> ? Mensaje_ext { get; set; }
     }
    
