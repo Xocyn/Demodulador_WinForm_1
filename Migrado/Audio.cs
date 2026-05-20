@@ -276,6 +276,82 @@ public class BFSKModulator
     }
 }
 
+/// <summary>
+/// Captura el audio del altavoz usando WASAPI Loopback Capture.
+/// Permite grabar lo que se está reproduciendo en el altavoz.
+/// </summary>
+public class LoopbackAudioCapture : IDisposable
+{
+    private WasapiLoopbackCapture _waveInEvent;
+    private List<byte> _capturedAudio = new List<byte>();
+    private bool _isRecording = false;
+    private TaskCompletionSource<byte[]> _captureTcs;
+
+    public LoopbackAudioCapture()
+    {
+        _waveInEvent = new WasapiLoopbackCapture();
+        _waveInEvent.DataAvailable += WaveInEvent_DataAvailable;
+        _waveInEvent.RecordingStopped += WaveInEvent_RecordingStopped;
+    }
+
+    private void WaveInEvent_DataAvailable(object sender, WaveInEventArgs e)
+    {
+        if (e.BytesRecorded > 0)
+        {
+            _capturedAudio.AddRange(e.Buffer.Take(e.BytesRecorded));
+        }
+    }
+
+    private void WaveInEvent_RecordingStopped(object sender, StoppedEventArgs e)
+    {
+        _isRecording = false;
+        if (_captureTcs != null && !_captureTcs.Task.IsCompleted)
+        {
+            _captureTcs.SetResult(_capturedAudio.ToArray());
+        }
+    }
+
+    /// <summary>
+    /// Inicia la captura de audio del loopback.
+    /// </summary>
+    public void StartCapture()
+    {
+        _capturedAudio.Clear();
+        _isRecording = true;
+        _waveInEvent.StartRecording();
+    }
+
+    /// <summary>
+    /// Detiene la captura y retorna los datos capturados como array de bytes.
+    /// </summary>
+    public async Task<byte[]> StopCaptureAsync()
+    {
+        _captureTcs = new TaskCompletionSource<byte[]>();
+        _waveInEvent.StopRecording();
+
+        var result = await _captureTcs.Task;
+        return result;
+    }
+
+    /// <summary>
+    /// Detiene la captura de forma síncrona.
+    /// </summary>
+    public byte[] StopCapture()
+    {
+        byte[] result = _capturedAudio.ToArray();
+        _waveInEvent.StopRecording();
+        _isRecording = false;
+        return result;
+    }
+
+    public bool IsRecording => _isRecording;
+
+    public void Dispose()
+    {
+        _waveInEvent?.Dispose();
+    }
+}
+
 public class AudioPlayer
 {
     public static void Play(string file)
@@ -288,5 +364,33 @@ public class AudioPlayer
 
         while (outputDevice.PlaybackState == PlaybackState.Playing)
             Thread.Sleep(100);
+    }
+
+    /// <summary>
+    /// Reproduce un archivo de audio de forma no-bloqueante (asíncrona).
+    /// Retorna una Task que se completa cuando termina la reproducción.
+    /// </summary>
+    public static async Task PlayAsync(string file)
+    {
+        var tcs = new TaskCompletionSource<bool>();
+
+        var audioFile = new AudioFileReader(file);
+        var outputDevice = new WaveOutEvent();
+
+        outputDevice.Init(audioFile);
+
+        EventHandler<StoppedEventArgs> stoppedHandler = null;
+        stoppedHandler = (s, e) =>
+        {
+            outputDevice.PlaybackStopped -= stoppedHandler;
+            audioFile?.Dispose();
+            outputDevice?.Dispose();
+            tcs.SetResult(true);
+        };
+
+        outputDevice.PlaybackStopped += stoppedHandler;
+        outputDevice.Play();
+
+        await tcs.Task;
     }
 }

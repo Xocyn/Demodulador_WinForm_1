@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Demodulador_DSC));
             label_banda = new Label();
             combox_hf_vhf = new ComboBox();
             dispositivos = new Label();
@@ -37,7 +38,9 @@
             MAINDISPLAY = new RichTextBox();
             waveViewer1 = new WaveViewerControl();
             dataGridView1 = new DataGridView();
+            detener = new Button();
             columna_formato = new DataGridViewTextBoxColumn();
+            categoria = new DataGridViewTextBoxColumn();
             columna_hora = new DataGridViewTextBoxColumn();
             column_ecc = new DataGridViewTextBoxColumn();
             columna_rta = new DataGridViewTextBoxColumn();
@@ -136,13 +139,24 @@
             dataGridView1.AllowUserToResizeColumns = false;
             dataGridView1.AllowUserToResizeRows = false;
             dataGridView1.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            dataGridView1.Columns.AddRange(new DataGridViewColumn[] { columna_formato, columna_hora, column_ecc, columna_rta, see_msg, rta_msg });
+            dataGridView1.Columns.AddRange(new DataGridViewColumn[] { columna_formato, categoria, columna_hora, column_ecc, columna_rta, see_msg, rta_msg });
             dataGridView1.Location = new Point(446, 666);
             dataGridView1.Name = "dataGridView1";
             dataGridView1.RowHeadersWidth = 51;
             dataGridView1.Size = new Size(978, 188);
             dataGridView1.TabIndex = 6;
             dataGridView1.CellContentClick += dataGridView1_CellContentClick;
+            // 
+            // detener
+            // 
+            detener.BackColor = Color.Red;
+            detener.Location = new Point(1621, 214);
+            detener.Name = "detener";
+            detener.Size = new Size(153, 99);
+            detener.TabIndex = 7;
+            detener.Text = "DETENER";
+            detener.UseVisualStyleBackColor = false;
+            detener.Click += detener_Click;
             // 
             // columna_formato
             // 
@@ -151,6 +165,14 @@
             columna_formato.Name = "columna_formato";
             columna_formato.ReadOnly = true;
             columna_formato.Width = 125;
+            // 
+            // categoria
+            // 
+            categoria.HeaderText = "Categoria";
+            categoria.MinimumWidth = 6;
+            categoria.Name = "categoria";
+            categoria.ReadOnly = true;
+            categoria.Width = 125;
             // 
             // columna_hora
             // 
@@ -196,7 +218,8 @@
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1924, 966);
+            ClientSize = new Size(1924, 990);
+            Controls.Add(detener);
             Controls.Add(dataGridView1);
             Controls.Add(waveViewer1);
             Controls.Add(splitContainer1);
@@ -204,6 +227,7 @@
             Controls.Add(dispositivos);
             Controls.Add(combox_hf_vhf);
             Controls.Add(label_banda);
+            Icon = (Icon)resources.GetObject("$this.Icon");
             MinimizeBox = false;
             Name = "Demodulador_DSC";
             Text = "Demodulador DSC";
@@ -228,7 +252,9 @@
         public RichTextBox MAINDISPLAY;
         public WaveViewerControl waveViewer1;
         private DataGridView dataGridView1;
+        private Button detener;
         private DataGridViewTextBoxColumn columna_formato;
+        private DataGridViewTextBoxColumn categoria;
         private DataGridViewTextBoxColumn columna_hora;
         private DataGridViewTextBoxColumn column_ecc;
         private DataGridViewTextBoxColumn columna_rta;

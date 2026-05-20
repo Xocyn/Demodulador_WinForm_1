@@ -28,6 +28,7 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(ventana_mensaje));
             txt_msj = new RichTextBox();
             SuspendLayout();
             // 
@@ -45,6 +46,7 @@
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(592, 543);
             Controls.Add(txt_msj);
+            Icon = (Icon)resources.GetObject("$this.Icon");
             Name = "ventana_mensaje";
             Load += ventana_mensaje_Load;
             ResumeLayout(false);

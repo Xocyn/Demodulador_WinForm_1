@@ -1,4 +1,4 @@
-using Dem_v2;
+﻿using Dem_v2;
 using Demodulador_WinForm_1.Ventana_new;
 using NAudio.Wave;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
@@ -10,9 +10,15 @@ namespace Demodulador_WinForm_1
         private CapturaDatos _capturaDatos;
         private bool _isCapturing = false;
         private readonly Procesamiento _procesamiento;
+
         public Demodulador_DSC()
         {
             InitializeComponent();
+            MAINDISPLAY.ReadOnly = true;
+            MAINDISPLAY.BackColor = Color.White;
+
+            DISPLAYSECUNDARIO.ReadOnly = true;
+            DISPLAYSECUNDARIO.BackColor = Color.White;
 
             _procesamiento = new Procesamiento(MAINDISPLAY, this);
 
@@ -80,45 +86,19 @@ namespace Demodulador_WinForm_1
         /// Agrega una fila a la tabla de forma thread-safe.
         /// Detecta si estamos en el thread de UI y usa Invoke() si es necesario.
         /// </summary>
-        public void AgregarFila(string formato, string hora, string ecc, string rta)
+        public void AgregarFila(string formato, string categoria, string hora, string ecc, string rta)
         {
             if (dataGridView1.InvokeRequired)
             {
                 // Estamos en un thread diferente, usar Invoke para actualizar UI
-                this.Invoke(() => AgregarFila(formato, hora, ecc, rta));
+                this.Invoke(() => AgregarFila(formato, categoria, hora, ecc, rta));
             }
             else
             {
                 // Estamos en el thread de UI, actualizar directamente
-                dataGridView1.Rows.Insert(0, formato, hora, ecc, rta);
+                dataGridView1.Rows.Insert(0, formato, categoria, hora, ecc, rta);
             }
         }
-
-        //private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
-        //{
-        //    if (e.RowIndex < 0) return;
-
-        //    // Forzar que el DataGridView registre el click en botones
-        //    dataGridView1.CommitEdit(DataGridViewDataErrorContexts.Commit);
-
-        //    Mensaje msg = null;
-        //    lock (_procesamiento.HistorialLock)
-        //    {
-        //        if (e.RowIndex < _procesamiento.HISTORIAL.Count)
-        //            msg = _procesamiento.HISTORIAL[e.RowIndex];
-        //    }
-
-        //    if (msg == null) return;
-
-        //    if (dataGridView1.Columns[e.ColumnIndex].Name == "see_msg")
-        //    {
-        //        MessageBox.Show($"Formato: {msg.Formato}\nFecha: {msg.Fecha_recepcion}\nACK: {msg.ack}");
-        //    }
-        //    else if (dataGridView1.Columns[e.ColumnIndex].Name == "rta_msg")
-        //    {
-        //        // lógica de respuesta
-        //    }
-        //}
         private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0) return;
@@ -135,7 +115,37 @@ namespace Demodulador_WinForm_1
             if (dataGridView1.Columns[e.ColumnIndex].Name == "see_msg")
             {
                 var ventana = new ventana_mensaje(msg);
+
+                this.Enabled = false;
+
+                ventana.FormClosed += (s, args) =>
+                {
+                    this.Enabled = true;
+                };
+
                 ventana.Show();
+            }
+
+            if (dataGridView1.Columns[e.ColumnIndex].Name == "rta_msg")
+            {
+                _capturaDatos.Pause();
+                Respuesta.Decidir(msg);
+                _capturaDatos.Resume();
+            }
+        }
+
+        private void detener_Click(object sender, EventArgs e)
+        {
+            DialogResult resultado = MessageBox.Show(
+             "¿DETENER LA CAPTURA DE DATOS?",
+             "",
+             MessageBoxButtons.YesNo,
+             MessageBoxIcon.Warning
+            );
+
+            if (resultado == DialogResult.Yes)
+            {
+                _capturaDatos.END();
             }
         }
     }

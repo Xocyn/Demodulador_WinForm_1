@@ -42,6 +42,8 @@ namespace Demodulador_WinForm_1
         private WaveDisplayManager _waveDisplayManager;
         private readonly Procesamiento _procesamiento;  // ← agregar campo
 
+        private bool pausa = false;
+
         public CapturaDatos(Demodulador_DSC form, Procesamiento procesamiento)  // ← agregar parámetro
         {
             _form = form;
@@ -261,6 +263,10 @@ namespace Demodulador_WinForm_1
             // ── Callback de audio ────────────────────────────────────────────────────
             _waveIn.DataAvailable += (s, a) =>
             {
+                // ── Pausa ─────────────────────────────────────────────────────────────
+                if (pausa)
+                    return;
+
                 // ── Capturar muestras para visualización ──────────────────────────────
                 if (a.BytesRecorded > 0)
                 {
@@ -449,5 +455,20 @@ namespace Demodulador_WinForm_1
             Thread.Sleep(500);
             IniciarCaptura();
         }
+
+        public void END()
+        {
+            _waveIn.StopRecording();
+        }
+        public void Pause()
+        {
+            pausa = true;
+        }
+
+        public void Resume()
+        {
+            pausa = false;
+        }
+
     }
 }

@@ -249,7 +249,7 @@ namespace Dem_v2
 
                     case 112:
                         MSG = _metodos.MSocorro(MENSAJE);
-                        MSG.ack = "RESPONDER";
+                        MSG.ack = "Esperando ACK";
                         break;
 
                     case 114:
@@ -266,18 +266,18 @@ namespace Dem_v2
 
                     case 123:
                         LogToDisplay("Formato 123 detectado (no implementado)\n");
-                        break;
+                        return;
 
                     default:
                         LogToDisplay($"Formato desconocido: {MENSAJE[0]}\n");
-                        break;
+                        return;
                 }
 
                 LogToDisplay("\n");
 
-                _form.AgregarFila(formatoMensaje, MSG.Fecha_recepcion.ToString("HH:mm:ss"), "CHECK", MSG.ack);
+                _form.AgregarFila(formatoMensaje, MSG.categoria, MSG.Fecha_recepcion.ToString("HH:mm:ss"), "CHECK", MSG.ack);
                 MSG.extension = extension;
-                List<int> M_E_M = MENSAJE_EXT.ToList(); 
+                List<int> M_E_M = MENSAJE_EXT.ToList(); // sino duplicaba se rompia
                 MSG.Mensaje_ext = (extension && ecc_ext) ? M_E_M : null;
 
                 lock (HistorialLock)
@@ -500,6 +500,7 @@ namespace Dem_v2
                 Fecha_recepcion = DateTime.Now,
                 Formato = 102,
                 ack = ack,
+                categoria = categoria,
             };
             return GEO;
         }
@@ -644,6 +645,7 @@ namespace Dem_v2
                 Fecha_recepcion = DateTime.Now,
                 Formato = 120,
                 ack = ack,
+                categoria = categoria,
             };
             return IND;
         }
@@ -700,6 +702,7 @@ namespace Dem_v2
                 data_respuesta = respuesta,
                 Formato = 112,
                 ack = ack,
+                categoria = "Socorro",
             };
             return SOC_2;
         }
@@ -778,6 +781,7 @@ namespace Dem_v2
                 Fecha_recepcion = DateTime.Now,
                 Formato = 114,
                 ack = ack,
+                categoria = categoria,
             };
             return GRUP;
         }
@@ -880,6 +884,7 @@ namespace Dem_v2
                 Fecha_recepcion = DateTime.Now,
                 Formato = 116,
                 ack = ack,
+                categoria = categoria,
             };
             return ALL;
         }
@@ -1332,10 +1337,11 @@ namespace Dem_v2
         public List<int> Mensaje_List { get; set; } 
         public DateTime Fecha_recepcion { get; set; }
         public string ack { get; set; } = string.Empty;
-        public List<int> ? data_respuesta { get; set; } // Acepta NULLs
+        public List<int> data_respuesta { get; set; }
         public int Formato { get; set; }
-        public bool extension { get; set; } // Acepta NULLs
-        public List<int> ? Mensaje_ext { get; set; }
+        public bool extension { get; set; } 
+        public string categoria { get; set; } = string.Empty;
+        public List<int> ? Mensaje_ext { get; set; } // Acepta NULLs
     }
    
 }

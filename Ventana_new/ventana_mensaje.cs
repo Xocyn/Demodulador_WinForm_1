@@ -19,6 +19,8 @@ namespace Demodulador_WinForm_1.Ventana_new
         public ventana_mensaje(Mensaje msg)
         {
             InitializeComponent();
+            txt_msj.ReadOnly = true;
+            txt_msj.BackColor = Color.White;
             _mensaje = msg;
 
             // Inicializar DisplayLogger con el RichTextBox
