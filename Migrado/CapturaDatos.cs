@@ -205,7 +205,7 @@ namespace Demodulador_WinForm_1
                 updateIntervalMs: 50      // Actualizar cada 50ms (~20 FPS)
             );
 
-            const int PhaseCount = 4;
+            const int PhaseCount = 2;
             var syncBuffers = new StringBuilder[PhaseCount];
             for (int p = 0; p < PhaseCount; p++) syncBuffers[p] = new StringBuilder();
 
@@ -215,7 +215,7 @@ namespace Demodulador_WinForm_1
             const string startPattern = "01010101010101010101"; // 20 bits
           
             Estado estado = Estado.EsperandoInicio;
-            int cooldownMs = 250;
+            int cooldownMs = 100; //250 andaba
             DateTime cooldownHasta = DateTime.MinValue;
 
             // ── Detector de silencio ─────────────────────────────────────────────

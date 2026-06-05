@@ -70,6 +70,52 @@ namespace Dem_v2
 
         }
 
+        static public void MensajeIndividual(string mmsi_rx, int categoria, int tipo_msg_ind, bool acuse, int canal, int motivo)
+        {
+            rta.Clear();
+            ecc.Clear();
+            Convertir.ConvertirNumero(120, rta); Convertir.ConvertirNumero(120, rta); ecc.Add(120);
+            Funcionalidades.MMSI(rta, ecc, mmsi_rx);
+            Convertir.ConvertirNumero(categoria, rta); ecc.Add(categoria);
+            Funcionalidades.MMSI(rta, ecc, MMSI);
+            Convertir.ConvertirNumero(tipo_msg_ind, rta); ecc.Add(tipo_msg_ind); // Primer telemando
+            // Segundo telemando 
+            if (tipo_msg_ind == 104)
+            {
+                Convertir.ConvertirNumero(motivo, rta); ecc.Add(motivo);
+            }
+            else
+            {
+                Convertir.ConvertirNumero(126, rta); ecc.Add(126); // Segundo telemando 
+            }
+            // Frecuencia de canal
+            if (tipo_msg_ind == 121 || tipo_msg_ind == 118)
+            {
+                Convertir.ConvertirNumero(126, rta); ecc.Add(126); Convertir.ConvertirNumero(126, rta); ecc.Add(126);
+                Convertir.ConvertirNumero(126, rta); ecc.Add(126); Convertir.ConvertirNumero(126, rta); ecc.Add(126);
+                Convertir.ConvertirNumero(126, rta); ecc.Add(126); Convertir.ConvertirNumero(126, rta); ecc.Add(126);
+            }
+            else
+            {
+                string canal_norma = (901000 + canal).ToString(); // Norma para mayoria simplex
+                General.Frec(rta, ecc, canal_norma);
+                General.Frec(rta, ecc, canal_norma);
+            }
+            // EOS
+            if (acuse)
+            {
+                Convertir.ConvertirNumero(122, rta); ecc.Add(122);
+                Convertir.ConvertirNumero(Convertir.Mod2Sum7Bits(ecc), rta);
+                Convertir.ConvertirNumero(122, rta); Convertir.ConvertirNumero(122, rta);
+            }
+            else
+            {
+                Convertir.ConvertirNumero(117, rta); ecc.Add(117);
+                Convertir.ConvertirNumero(Convertir.Mod2Sum7Bits(ecc), rta);
+                Convertir.ConvertirNumero(117, rta); Convertir.ConvertirNumero(117, rta);
+            }
+            EOS();
+        }
         static public void EOS()
         {
             List<int> phasignseq = new List<int> { 125, 111, 125, 110, 125, 109, 125, 108, 125, 107, 125, 106 }; 
@@ -292,6 +338,112 @@ namespace Dem_v2
                 return result;
             }
 
+        }
+        internal class Funcionalidades
+        {
+            static public void MMSI(StringBuilder resultadoConChequeo, List<int> ECC, string numero)
+            {
+                List<int> mmsi = new List<int>();
+
+                // Agrupar de 2 en 2
+                List<string> grupos = AgruparDeDosEnDos(numero);
+                foreach (string grupo in grupos)
+                {
+                    int value = Convert.ToInt32(grupo, 10);
+                    mmsi.Add(value);
+                }
+
+                foreach (int mm in mmsi)
+                {
+                    ECC.Add(mm);
+                    Convertir.ConvertirNumero(mm, rta);
+                }
+
+            }
+
+            static List<string> AgruparDeDosEnDos(string numero)
+            {
+                List<string> grupos = new List<string>();
+
+                // Si es impar, agregar '0' al final
+                if (numero.Length % 2 != 0)
+                {
+                    numero += "0"; // se le agrega un 0 al final para completar el ultimo grupo de 2 (NORMA)
+                }
+
+                // Agrupar de 2 en 2
+                for (int i = 0; i < numero.Length; i += 2)
+                {
+                    string grupo = numero.Substring(i, 2);
+                    grupos.Add(grupo);
+                }
+
+                return grupos;
+            }
+
+            public static void Posicion(StringBuilder resultadoConChequeo, List<int> ECC)
+            {
+                // -38.04248790955501, -57.545178158600976  MDP
+                Convertir.ConvertirNumero(33, rta); ECC.Add(33);
+                Convertir.ConvertirNumero(80, rta); ECC.Add(80);
+                Convertir.ConvertirNumero(40, rta); ECC.Add(40);
+                Convertir.ConvertirNumero(57, rta); ECC.Add(57);
+                Convertir.ConvertirNumero(54, rta); ECC.Add(54);
+
+                // Obtener zona horaria de Argentina
+                TimeZoneInfo argentinaZone = TimeZoneInfo.FindSystemTimeZoneById("Argentina Standard Time");
+
+                // Convertir hora UTC a hora Argentina
+                DateTime argentinaTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, argentinaZone);
+
+                int hora = argentinaTime.Hour;
+                int minutos = argentinaTime.Minute;
+                Convertir.ConvertirNumero(hora, rta); ECC.Add(hora);
+                Convertir.ConvertirNumero(minutos, rta); ECC.Add(minutos);
+            }
+        }
+
+        internal class General
+        {
+            static public void Frec(StringBuilder resultadoConChequeo, List<int> ECC, string numero)
+            {
+                List<int> frec_canal = new List<int>();
+
+                // Agrupar de 2 en 2
+                List<string> grupos = Agrupar_2(numero);
+                foreach (string grupo in grupos)
+                {
+                    int value = Convert.ToInt32(grupo, 10);
+                    frec_canal.Add(value);
+                }
+
+                foreach (int fc in frec_canal)
+                {
+                    ECC.Add(fc);
+                    Convertir.ConvertirNumero(fc, rta);
+                }
+
+            }
+
+            static List<string> Agrupar_2(string numero)
+            {
+                List<string> grupos = new List<string>();
+
+                // Si es impar, agregar '3' al inicio
+                //if (numero.Length % 2 != 0)
+                //{
+                //    numero = "3" + numero; // se le agrega un 3 al inicio
+                //}
+
+                // Agrupar de 2 en 2
+                for (int i = 0; i < numero.Length; i += 2)
+                {
+                    string grupo = numero.Substring(i, 2);
+                    grupos.Add(grupo);
+                }
+
+                return grupos;
+            }
         }
     }
 }

@@ -38,7 +38,6 @@
             MAINDISPLAY = new RichTextBox();
             waveViewer1 = new WaveViewerControl();
             dataGridView1 = new DataGridView();
-            detener = new Button();
             columna_formato = new DataGridViewTextBoxColumn();
             categoria = new DataGridViewTextBoxColumn();
             columna_hora = new DataGridViewTextBoxColumn();
@@ -46,6 +45,8 @@
             columna_rta = new DataGridViewTextBoxColumn();
             see_msg = new DataGridViewButtonColumn();
             rta_msg = new DataGridViewButtonColumn();
+            detener = new Button();
+            enviar_btn = new Button();
             ((System.ComponentModel.ISupportInitialize)splitContainer1).BeginInit();
             splitContainer1.Panel1.SuspendLayout();
             splitContainer1.Panel2.SuspendLayout();
@@ -147,17 +148,6 @@
             dataGridView1.TabIndex = 6;
             dataGridView1.CellContentClick += dataGridView1_CellContentClick;
             // 
-            // detener
-            // 
-            detener.BackColor = Color.Red;
-            detener.Location = new Point(1621, 214);
-            detener.Name = "detener";
-            detener.Size = new Size(153, 99);
-            detener.TabIndex = 7;
-            detener.Text = "DETENER";
-            detener.UseVisualStyleBackColor = false;
-            detener.Click += detener_Click;
-            // 
             // columna_formato
             // 
             columna_formato.HeaderText = "Formato";
@@ -214,11 +204,34 @@
             rta_msg.ReadOnly = true;
             rta_msg.Width = 125;
             // 
+            // detener
+            // 
+            detener.BackColor = Color.Red;
+            detener.Location = new Point(1621, 214);
+            detener.Name = "detener";
+            detener.Size = new Size(153, 99);
+            detener.TabIndex = 7;
+            detener.Text = "DETENER";
+            detener.UseVisualStyleBackColor = false;
+            detener.Click += detener_Click;
+            // 
+            // enviar_btn
+            // 
+            enviar_btn.BackColor = Color.RoyalBlue;
+            enviar_btn.Location = new Point(1621, 482);
+            enviar_btn.Name = "enviar_btn";
+            enviar_btn.Size = new Size(153, 99);
+            enviar_btn.TabIndex = 8;
+            enviar_btn.Text = "ENVIAR";
+            enviar_btn.UseVisualStyleBackColor = false;
+            enviar_btn.Click += enviar_btn_Click;
+            // 
             // Demodulador_DSC
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1924, 990);
+            Controls.Add(enviar_btn);
             Controls.Add(detener);
             Controls.Add(dataGridView1);
             Controls.Add(waveViewer1);
@@ -260,5 +273,6 @@
         private DataGridViewTextBoxColumn columna_rta;
         private DataGridViewButtonColumn see_msg;
         private DataGridViewButtonColumn rta_msg;
+        private Button enviar_btn;
     }
 }

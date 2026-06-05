@@ -192,6 +192,28 @@ public class BFSKDemodulator
         }
         return I * I + Q * Q;
     }
+    private static double EnergyIQ_2(List<short> s, int start, int length, double freq)
+    {
+        // Pre-cálculo de coeficientes para la frecuencia objetivo
+        double omega = 2.0 * Math.PI * freq / SampleRate;
+        double coeff = 2.0 * Math.Cos(omega);
+
+        double s1 = 0.0;
+        double s2 = 0.0;
+
+        for (int n = 0; n < length; n++)
+        {
+            double sample = s[start + n];
+
+            // Ecuación en diferencias de Goertzel
+            double s0 = sample + coeff * s1 - s2;
+            s2 = s1;
+            s1 = s0;
+        }
+
+        // Cálculo final de la magnitud al cuadrado (equivalente a I^2 + Q^2)
+        return (s1 * s1) + (s2 * s2) - (coeff * s1 * s2);
+    }
 
     private static (double e0, double e1) EnergyIQStatic(short[] s, int start, int length, double f0, double f1)
     {

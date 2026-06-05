@@ -1,5 +1,6 @@
 ﻿using Dem_v2;
 using Demodulador_WinForm_1.Ventana_new;
+using Demodulador_WinForm_1.Ventana_rtas;
 using NAudio.Wave;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
@@ -10,7 +11,7 @@ namespace Demodulador_WinForm_1
         private CapturaDatos _capturaDatos;
         private bool _isCapturing = false;
         private readonly Procesamiento _procesamiento;
-
+        public bool vhf => combox_hf_vhf.SelectedIndex == 1;
         public Demodulador_DSC()
         {
             InitializeComponent();
@@ -147,6 +148,12 @@ namespace Demodulador_WinForm_1
             {
                 _capturaDatos.END();
             }
+        }
+
+        private void enviar_btn_Click(object sender, EventArgs e)
+        {
+            var ventanaEnvio = new envios_rtas(vhf);
+            ventanaEnvio.Show();
         }
     }
 
