@@ -34,7 +34,7 @@ namespace Dem_v2
         public readonly object HistorialLock = new object();
 
 
-        public Procesamiento(RichTextBox mainDisplay, Demodulador_DSC form = null)
+        public Procesamiento(RichTextBox mainDisplay = null, Demodulador_DSC form = null)
         {
             _mainDisplay = mainDisplay;
             _logger = new DisplayLogger(mainDisplay);

@@ -1,6 +1,7 @@
 ﻿using Dem_v2;
 using Demodulador_WinForm_1.Ventana_new;
 using Demodulador_WinForm_1.Ventana_rtas;
+using Demodulador_WinForm_1.Ventana_rtx_ack;
 using NAudio.Wave;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
@@ -28,7 +29,7 @@ namespace Demodulador_WinForm_1
             dataGridView1.RowHeadersVisible = false;
             dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
 
-            _capturaDatos = new CapturaDatos(this, _procesamiento);
+            _capturaDatos = new CapturaDatos(_procesamiento, this);
 
             for (int i = 0; i < WaveInEvent.DeviceCount; i++)
             {
@@ -129,9 +130,8 @@ namespace Demodulador_WinForm_1
 
             if (dataGridView1.Columns[e.ColumnIndex].Name == "rta_msg")
             {
-                _capturaDatos.Pause();
-                Respuesta.Decidir(msg);
-                _capturaDatos.Resume();
+                var ventana_ack_rtx = new ack_rtx(msg);
+                ventana_ack_rtx.Show();
             }
         }
 

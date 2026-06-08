@@ -44,7 +44,7 @@ namespace Demodulador_WinForm_1
 
         private bool pausa = false;
 
-        public CapturaDatos(Demodulador_DSC form, Procesamiento procesamiento)  // ← agregar parámetro
+        public CapturaDatos(Procesamiento procesamiento, Demodulador_DSC form = null)  // ← agregar parámetro
         {
             _form = form;
             _procesamiento = procesamiento;  // ← guardar referencia

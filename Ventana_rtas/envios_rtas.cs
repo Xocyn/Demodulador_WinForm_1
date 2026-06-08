@@ -24,6 +24,9 @@ namespace Demodulador_WinForm_1.Ventana_rtas
         public envios_rtas(bool vhf)
         {
             InitializeComponent();
+            this.FormBorderStyle = FormBorderStyle.FixedSingle;
+            this.MaximizeBox = false;
+
             IniciarTabla();
 
             this.vhf = vhf;
@@ -479,24 +482,5 @@ namespace Demodulador_WinForm_1.Ventana_rtas
             combox_sig_com_geo.SelectedIndex = -1;
         }
 
-        private void ProtocoloGeografica2()
-        {
-            int sig_com;
-            int canal = int.Parse(text_canal_hf.Text);
-            switch (combox_sig_com_geo.SelectedIndex)
-            {
-                case 0: // J3E
-                    sig_com = 109;
-                    break;
-                case 1: // FEC - TTY
-                    sig_com = 113;
-                    break;
-                default:
-                    sig_com = 126;
-                    break;
-            }
-            Respuesta.MensajeGeografico(sig_com, canal, 5);
-            combox_sig_com_geo.SelectedIndex = -1;
-        }
     }
 }

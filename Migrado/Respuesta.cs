@@ -15,38 +15,15 @@ namespace Dem_v2
 
         static public void Decidir(Mensaje msg)
         { 
-            switch (msg.Formato)
+            switch (msg.Formato) // voy a tener que responder a las rtx de ack en este metodo
             {
                 case 112:
                     RespuestaSocorro(msg.data_respuesta);
-                    break;
-                case 120:
-                    //RespuestaIndividual(msg.data_respuesta);
                     break;
                 default:
                     break;
             }
         }
-        //public static void RespuestaIndividual(List<int> datos_respuesta)
-        //{
-        //    rta.Clear();
-        //    ecc.Clear();
-        //    // ⚠️ IMPORTANTE: Crear una copia para evitar modificar la lista original
-        //    List<int> datos_local = new List<int>(datos_respuesta);
-        //    Geografica.EliminarPosicionesImpares(datos_local);
-        //    Convertir.ConvertirNumero(116, rta); Convertir.ConvertirNumero(116, rta); ecc.Add(116);
-        //    Convertir.ConvertirNumero(120, rta); ecc.Add(120);
-        //    Convertir.MMSI(rta, ecc, MMSI);
-        //    Convertir.ConvertirNumero(110, rta); ecc.Add(110);
-        //    for (int i = 0; i < datos_local.Count; i++)
-        //    {
-        //        Convertir.ConvertirNumero(datos_local[i], rta); ecc.Add(datos_local[i]);
-        //    }
-        //    Convertir.ConvertirNumero(127, rta); ecc.Add(127);
-        //    Convertir.ConvertirNumero(Convertir.Mod2Sum7Bits(ecc), rta);
-        //    Convertir.ConvertirNumero(127, rta); Convertir.ConvertirNumero(127, rta);
-        //    EOS();
-        //}
         static public void RespuestaSocorro(List<int> datos_respuesta)
         {
             rta.Clear();
@@ -157,7 +134,7 @@ namespace Dem_v2
 
         static public void MensajeGeografico(int sig_com, int canal, int zona)
         { 
-
+            // DESARROLLAR
         }
         static public void EOS()
         {

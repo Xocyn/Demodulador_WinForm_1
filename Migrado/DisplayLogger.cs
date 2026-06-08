@@ -17,9 +17,9 @@ namespace Demodulador_WinForm_1.Migrado
         private readonly Almacenamiento _almacenamiento;
         private readonly object _displayLock = new object();
 
-        public DisplayLogger(RichTextBox mainDisplay)
+        public DisplayLogger(RichTextBox mainDisplay = null)
         {
-            _mainDisplay = mainDisplay ?? throw new ArgumentNullException(nameof(mainDisplay));
+            _mainDisplay = mainDisplay;
             _almacenamiento = new Almacenamiento();
         }
 
