@@ -1,4 +1,5 @@
-﻿using System;
+﻿using MathNet.Numerics.Distributions;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -114,6 +115,43 @@ namespace Dem_v2
                 Convertir.ConvertirNumero(Convertir.Mod2Sum7Bits(ecc), rta);
                 Convertir.ConvertirNumero(117, rta); Convertir.ConvertirNumero(117, rta);
             }
+            EOS();
+        }
+
+        static public void MensajeAllShips(int categoria, int canal)
+        {
+            rta.Clear();
+            ecc.Clear();
+            Convertir.ConvertirNumero(116, rta); Convertir.ConvertirNumero(116, rta); ecc.Add(116);
+            Convertir.ConvertirNumero(categoria, rta); ecc.Add(categoria);
+            Funcionalidades.MMSI(rta, ecc, MMSI);
+            Convertir.ConvertirNumero(100, rta); ecc.Add(100); // Primer telemando
+            Convertir.ConvertirNumero(126, rta); ecc.Add(126); // Segundo telemando
+            string canal_norma = (901000 + canal).ToString(); // Norma para mayoria simplex
+            General.Frec(rta, ecc, canal_norma);
+            General.Frec(rta, ecc, canal_norma);
+            Convertir.ConvertirNumero(127, rta); ecc.Add(127);
+            Convertir.ConvertirNumero(Convertir.Mod2Sum7Bits(ecc), rta);
+            Convertir.ConvertirNumero(127, rta); Convertir.ConvertirNumero(127, rta);
+            EOS();
+        }
+
+        static public void MensajeGrupos(int sig_com, string mmsi_rx, int canal)
+        {
+            rta.Clear();
+            ecc.Clear();
+            Convertir.ConvertirNumero(114, rta); Convertir.ConvertirNumero(114, rta); ecc.Add(114);
+            Funcionalidades.MMSI(rta, ecc, mmsi_rx);
+            Convertir.ConvertirNumero(100, rta); ecc.Add(100); // RUTINA
+            Funcionalidades.MMSI(rta, ecc, MMSI);
+            Convertir.ConvertirNumero(sig_com, rta); ecc.Add(sig_com); // Primer telemando
+            Convertir.ConvertirNumero(126, rta); ecc.Add(126); // Segundo telemando
+            string canal_norma = (901000 + canal).ToString(); // Norma para mayoria simplex
+            General.Frec(rta, ecc, canal_norma);
+            General.Frec(rta, ecc, canal_norma);
+            Convertir.ConvertirNumero(127, rta); ecc.Add(127);
+            Convertir.ConvertirNumero(Convertir.Mod2Sum7Bits(ecc), rta);
+            Convertir.ConvertirNumero(127, rta); Convertir.ConvertirNumero(127, rta);
             EOS();
         }
         static public void EOS()

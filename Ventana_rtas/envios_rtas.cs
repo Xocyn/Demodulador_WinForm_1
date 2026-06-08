@@ -19,6 +19,8 @@ namespace Demodulador_WinForm_1.Ventana_rtas
          new HashSet<int>();
 
         private int ultimoIndiceValido = 0;
+
+        private string formato = "";
         public envios_rtas(bool vhf)
         {
             InitializeComponent();
@@ -62,18 +64,17 @@ namespace Demodulador_WinForm_1.Ventana_rtas
                 dt.Rows.Add(lineas[i].Split(','));
             }
 
-            dataGridView1.DataSource = dt;
-            //this.WindowState = FormWindowState.Maximized;
-            dataGridView1.AllowUserToAddRows = false;
-            dataGridView1.RowHeadersVisible = false;
-            dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-            dataGridView1.ReadOnly = true;
-            dataGridView1.AllowUserToAddRows = false;
-            dataGridView1.AllowUserToDeleteRows = false;
-            dataGridView1.AllowUserToResizeColumns = false;
-            dataGridView1.AllowUserToResizeRows = false;
-            dataGridView1.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
-            dataGridView1.MultiSelect = false;
+            dataGridView1.DataSource = dt; dataGridView2.DataSource = dt; dataGridView3.DataSource = dt;
+            dataGridView1.AllowUserToAddRows = false; dataGridView2.AllowUserToAddRows = false; dataGridView3.AllowUserToAddRows = false;
+            dataGridView1.RowHeadersVisible = false; dataGridView2.RowHeadersVisible = false; dataGridView3.RowHeadersVisible = false;
+            dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill; dataGridView2.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill; dataGridView3.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+            dataGridView1.ReadOnly = true; dataGridView2.ReadOnly = true; dataGridView3.ReadOnly = true;
+            dataGridView1.AllowUserToAddRows = false; dataGridView2.AllowUserToAddRows = false; dataGridView3.AllowUserToAddRows = false;
+            dataGridView1.AllowUserToDeleteRows = false; dataGridView2.AllowUserToDeleteRows = false; dataGridView3.AllowUserToDeleteRows = false;
+            dataGridView1.AllowUserToResizeColumns = false; dataGridView2.AllowUserToResizeColumns = false; dataGridView3.AllowUserToResizeColumns = false;
+            dataGridView1.AllowUserToResizeRows = false; dataGridView2.AllowUserToResizeRows = false; dataGridView3.AllowUserToResizeRows = false;
+            dataGridView1.SelectionMode = DataGridViewSelectionMode.FullRowSelect; dataGridView2.SelectionMode = DataGridViewSelectionMode.FullRowSelect; dataGridView3.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+            dataGridView1.MultiSelect = false; dataGridView2.MultiSelect = false; dataGridView3.MultiSelect = false;
         }
         private void formato_selec_SelectedIndexChanged(object sender, EventArgs e)
         {
@@ -87,6 +88,14 @@ namespace Demodulador_WinForm_1.Ventana_rtas
             if (formato_selec.SelectedItem.ToString() == "INDIVIDUAL")
             {
                 Mostrar("INDIVIDUAL");
+            }
+            if (formato_selec.SelectedItem.ToString() == "ALL SHIPS")
+            {
+                Mostrar("ALL SHIPS");
+            }
+            if (formato_selec.SelectedItem.ToString() == "GRUPOS")
+            {
+                Mostrar("GRUPOS");
             }
         }
 
@@ -113,10 +122,22 @@ namespace Demodulador_WinForm_1.Ventana_rtas
 
         private void Mostrar(string eleccion)
         {
+            box_all.Visible = false;
+            box_ind.Visible = false;
+            box_grupos.Visible = false;
+
             if (eleccion == "INDIVIDUAL")
             {
                 box_ind.Visible = true;
                 combox_tipo_msg_ind.Enabled = false;
+            }
+            if (eleccion == "ALL SHIPS")
+            {
+                box_all.Visible = true;
+            }
+            if (eleccion == "GRUPOS")
+            {
+                box_grupos.Visible = true;
             }
         }
 
@@ -141,6 +162,7 @@ namespace Demodulador_WinForm_1.Ventana_rtas
         private void combox_categoria_SelectedIndexChanged(object sender, EventArgs e)
         {
             indicesBloqueados.Clear();
+            combox_tipo_msg_ind.SelectedIndex = -1;
 
             string categoria = combox_categoria.SelectedItem?.ToString() ?? "";
             if (string.IsNullOrEmpty(categoria))
@@ -167,6 +189,15 @@ namespace Demodulador_WinForm_1.Ventana_rtas
             // Redibujar ComboBox
             combox_tipo_msg_ind.Enabled = true;
             combox_tipo_msg_ind.Invalidate();
+            VerificarCondiciones();
+        }
+        private void combox_cat_all_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            VerificarCondiciones();
+        }
+
+        private void combox_sig_com_SelectedIndexChanged(object sender, EventArgs e)
+        {
             VerificarCondiciones();
         }
         private void combox_tipo_msg_ind_DrawItem(object sender, DrawItemEventArgs e)
@@ -205,9 +236,22 @@ namespace Demodulador_WinForm_1.Ventana_rtas
                 bool canal_ind = !string.IsNullOrEmpty(text_canal.Text) && text_canal.Text.All(char.IsDigit);
                 bool cat_ind = combox_categoria.SelectedIndex != -1 && combox_tipo_msg_ind.SelectedIndex != -1;
                 boton_enviar_ind.Visible = mmsirxValido && canal_ind && cat_ind;
+                formato = "INDIVIDUAL";
             }
-
-
+            if (formato_selec.SelectedItem != null && formato_selec.SelectedItem.ToString() == "ALL SHIPS")
+            {
+                bool canal_all = !string.IsNullOrEmpty(text_canal_all.Text) && text_canal_all.Text.All(char.IsDigit);
+                bool cat_all = combox_cat_all.SelectedIndex != -1;
+                boton_enviar_ind.Visible = canal_all && cat_all;
+                formato = "ALL SHIPS";
+            }
+            if (formato_selec.SelectedItem != null && formato_selec.SelectedItem.ToString() == "GRUPOS")
+            {
+                bool canal_group = !string.IsNullOrEmpty(text_canal_group.Text) && text_canal_group.Text.All(char.IsDigit);
+                bool cat_group = combox_sig_com.SelectedIndex != -1;
+                boton_enviar_ind.Visible = canal_group && cat_group && mmsirxValido;
+                formato = "GRUPOS";
+            }
         }
 
         private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
@@ -218,12 +262,58 @@ namespace Demodulador_WinForm_1.Ventana_rtas
             }
         }
 
+        private void dataGridView2_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0) // Evita que se ejecute al pulsar el encabezado
+            {
+                text_canal_all.Text = dataGridView2.Rows[e.RowIndex].Cells[0].Value?.ToString();
+            }
+        }
+
+        private void dataGridView3_CellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0) // Evita que se ejecute al pulsar el encabezado
+            {
+                text_canal_group.Text = dataGridView3.Rows[e.RowIndex].Cells[0].Value?.ToString();
+            }
+        }
+
         private void text_canal_TextChanged(object sender, EventArgs e)
         {
             VerificarCondiciones();
         }
 
         private void boton_enviar_ind_Click(object sender, EventArgs e)
+        {
+            switch (formato)
+            {
+                case "INDIVIDUAL":
+                    ProtocoloInd();
+                    break;
+                case "ALL SHIPS":
+                    ProtocoloAll();
+                    break;
+                case "GRUPOS":
+                    ProtocoloGrupos();
+                    break;
+            }
+
+        }
+        private void text_canal_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            if (!char.IsDigit(e.KeyChar) && !char.IsControl(e.KeyChar))
+            {
+                e.Handled = true;
+            }
+
+            // Limitar a 3 caracteres
+            if (text_canal.Text.Length >= 3 && !char.IsControl(e.KeyChar))
+            {
+                e.Handled = true;
+            }
+        }
+
+        private void ProtocoloInd()
         {
             int categoria;
             int tipo_msg_ind;
@@ -298,23 +388,48 @@ namespace Demodulador_WinForm_1.Ventana_rtas
             combox_tipo_msg_ind.Enabled = false;
         }
 
-        private void envios_rtas_Load(object sender, EventArgs e)
+        private void ProtocoloAll()
         {
-
+            int categoria;
+            int canal = int.Parse(text_canal_all.Text);
+            switch (combox_cat_all.SelectedIndex)
+            {
+                case 0: // SEGURIDAD
+                    categoria = 108;
+                    break;
+                case 1: // URGENCIA
+                    categoria = 110;
+                    break;
+                default:
+                    categoria = 0;
+                    break;
+            }
+            Respuesta.MensajeAllShips(categoria, canal);
+            combox_cat_all.SelectedIndex = -1;
         }
 
-        private void text_canal_KeyPress(object sender, KeyPressEventArgs e)
+        private void ProtocoloGrupos()
         {
-            if (!char.IsDigit(e.KeyChar) && !char.IsControl(e.KeyChar))
+            int sig_com;
+            int canal = int.Parse(text_canal_group.Text);
+            switch (combox_sig_com.SelectedIndex)
             {
-                e.Handled = true;
+                case 0: // RT all modes
+                    sig_com = 100;
+                    break;
+                case 1: // J3E
+                    sig_com = 109;
+                    break;
+                case 2: // FEC - TTY
+                    sig_com = 113;
+                    break;
+                default:
+                    sig_com = 126;
+                    break;
             }
+            Respuesta.MensajeGrupos(sig_com, MMSI_rx.Text, canal);
+            combox_sig_com.SelectedIndex = -1;
 
-            // Limitar a 3 caracteres
-            if (text_canal.Text.Length >= 3 && !char.IsControl(e.KeyChar))
-            {
-                e.Handled = true;
-            }
         }
     }
 }
