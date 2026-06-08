@@ -50,6 +50,11 @@
             label_cat_all = new Label();
             combox_cat_all = new ComboBox();
             box_grupos = new GroupBox();
+            box_geo = new GroupBox();
+            text_canal_hf = new TextBox();
+            label_canal_hf = new Label();
+            label2 = new Label();
+            combox_sig_com_geo = new ComboBox();
             dataGridView3 = new DataGridView();
             text_canal_group = new TextBox();
             label_group_vhf = new Label();
@@ -60,6 +65,7 @@
             box_all.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView2).BeginInit();
             box_grupos.SuspendLayout();
+            box_geo.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView3).BeginInit();
             SuspendLayout();
             // 
@@ -292,6 +298,54 @@
             box_grupos.Text = "GRUPOS";
             box_grupos.Visible = false;
             // 
+            // box_geo
+            // 
+            box_geo.Controls.Add(text_canal_hf);
+            box_geo.Controls.Add(label_canal_hf);
+            box_geo.Controls.Add(label2);
+            box_geo.Controls.Add(combox_sig_com_geo);
+            box_geo.Location = new Point(12, 102);
+            box_geo.Name = "box_geo";
+            box_geo.Size = new Size(803, 354);
+            box_geo.TabIndex = 18;
+            box_geo.TabStop = false;
+            box_geo.Text = "GEOGRAFICA";
+            box_geo.Visible = false;
+            // 
+            // text_canal_hf
+            // 
+            text_canal_hf.Location = new Point(548, 27);
+            text_canal_hf.Name = "text_canal_hf";
+            text_canal_hf.Size = new Size(223, 27);
+            text_canal_hf.TabIndex = 16;
+            // 
+            // label_canal_hf
+            // 
+            label_canal_hf.AutoSize = true;
+            label_canal_hf.Location = new Point(432, 30);
+            label_canal_hf.Name = "label_canal_hf";
+            label_canal_hf.Size = new Size(92, 20);
+            label_canal_hf.TabIndex = 15;
+            label_canal_hf.Text = "Canal de HF:";
+            // 
+            // label2
+            // 
+            label2.AutoSize = true;
+            label2.Location = new Point(6, 30);
+            label2.Name = "label2";
+            label2.Size = new Size(170, 20);
+            label2.TabIndex = 13;
+            label2.Text = "Comunicación siguiente:";
+            // 
+            // combox_sig_com_geo
+            // 
+            combox_sig_com_geo.FormattingEnabled = true;
+            combox_sig_com_geo.Items.AddRange(new object[] { "J3E - RT", "F1B - FEC " });
+            combox_sig_com_geo.Location = new Point(192, 27);
+            combox_sig_com_geo.Name = "combox_sig_com_geo";
+            combox_sig_com_geo.Size = new Size(153, 28);
+            combox_sig_com_geo.TabIndex = 14;
+            // 
             // dataGridView3
             // 
             dataGridView3.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
@@ -342,7 +396,6 @@
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(830, 459);
-            Controls.Add(box_grupos);
             Controls.Add(label_MMSI_rx);
             Controls.Add(boton_enviar_ind);
             Controls.Add(MMSI_rx);
@@ -350,6 +403,8 @@
             Controls.Add(formato_selec);
             Controls.Add(box_all);
             Controls.Add(box_ind);
+            Controls.Add(box_grupos);
+            Controls.Add(box_geo);
             Name = "envios_rtas";
             Text = "envios_rtas";
             box_ind.ResumeLayout(false);
@@ -360,6 +415,8 @@
             ((System.ComponentModel.ISupportInitialize)dataGridView2).EndInit();
             box_grupos.ResumeLayout(false);
             box_grupos.PerformLayout();
+            box_geo.ResumeLayout(false);
+            box_geo.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView3).EndInit();
             ResumeLayout(false);
             PerformLayout();
@@ -394,5 +451,10 @@
         private Label label_group_vhf;
         private Label label_sig_com_g;
         private ComboBox combox_sig_com;
+        private GroupBox box_geo;
+        private TextBox text_canal_hf;
+        private Label label_canal_hf;
+        private Label label2;
+        private ComboBox combox_sig_com_geo;
     }
 }

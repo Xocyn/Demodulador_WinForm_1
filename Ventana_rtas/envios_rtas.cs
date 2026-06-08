@@ -78,24 +78,34 @@ namespace Demodulador_WinForm_1.Ventana_rtas
         }
         private void formato_selec_SelectedIndexChanged(object sender, EventArgs e)
         {
+            // Verificar si hay algo seleccionado
+            if (formato_selec.SelectedItem == null)
+                return;
 
-            if (vhf && formato_selec.SelectedIndex != -1 && formato_selec.SelectedItem.ToString() == "GEOGRAFICA")
+            string seleccion = formato_selec.SelectedItem.ToString();
+
+            if (vhf && seleccion == "GEOGRAFICA")
             {
                 MessageBox.Show("Opción deshabilitada para VHF");
                 formato_selec.ClearSelected();
+                return; // Importante: salir después de ClearSelected()
             }
 
-            if (formato_selec.SelectedItem.ToString() == "INDIVIDUAL")
+            if (seleccion == "INDIVIDUAL")
             {
                 Mostrar("INDIVIDUAL");
             }
-            if (formato_selec.SelectedItem.ToString() == "ALL SHIPS")
+            else if (seleccion == "ALL SHIPS")
             {
                 Mostrar("ALL SHIPS");
             }
-            if (formato_selec.SelectedItem.ToString() == "GRUPOS")
+            else if (seleccion == "GRUPOS")
             {
                 Mostrar("GRUPOS");
+            }
+            else if (seleccion == "GEOGRAFICA" && !vhf)
+            {
+                Mostrar("GEOGRAFICA");
             }
         }
 
@@ -138,6 +148,10 @@ namespace Demodulador_WinForm_1.Ventana_rtas
             if (eleccion == "GRUPOS")
             {
                 box_grupos.Visible = true;
+            }
+            if (eleccion == "GEOGRAFICA")
+            {
+                box_geo.Visible = true;
             }
         }
 
@@ -252,6 +266,13 @@ namespace Demodulador_WinForm_1.Ventana_rtas
                 boton_enviar_ind.Visible = canal_group && cat_group && mmsirxValido;
                 formato = "GRUPOS";
             }
+            if (formato_selec.SelectedItem != null && formato_selec.SelectedItem.ToString() == "GEOGRAFICA")
+            {
+                bool canal_geo = !string.IsNullOrEmpty(text_canal_hf.Text) && text_canal_hf.Text.All(char.IsDigit);
+                bool cat_geo = combox_sig_com_geo.SelectedIndex != -1;
+                boton_enviar_ind.Visible = canal_geo && cat_geo;
+                formato = "GEOGRAFICA";
+            }
         }
 
         private void dataGridView1_CellClick(object sender, DataGridViewCellEventArgs e)
@@ -295,6 +316,9 @@ namespace Demodulador_WinForm_1.Ventana_rtas
                     break;
                 case "GRUPOS":
                     ProtocoloGrupos();
+                    break;
+                case "GEOGRAFICA":
+                    ProtocoloGeografica();
                     break;
             }
 
@@ -430,6 +454,49 @@ namespace Demodulador_WinForm_1.Ventana_rtas
             Respuesta.MensajeGrupos(sig_com, MMSI_rx.Text, canal);
             combox_sig_com.SelectedIndex = -1;
 
+        }
+
+        private void ProtocoloGeografica()
+        {
+            int sig_com;
+            int canal = int.Parse(text_canal_hf.Text);
+            switch (combox_sig_com_geo.SelectedIndex)
+            {
+                case 0: // RT all modes
+                    sig_com = 100;
+                    break;
+                case 1: // J3E
+                    sig_com = 109;
+                    break;
+                case 2: // FEC - TTY
+                    sig_com = 113;
+                    break;
+                default:
+                    sig_com = 126;
+                    break;
+            }
+            Respuesta.MensajeGeografico(sig_com, canal, 5);
+            combox_sig_com_geo.SelectedIndex = -1;
+        }
+
+        private void ProtocoloGeografica2()
+        {
+            int sig_com;
+            int canal = int.Parse(text_canal_hf.Text);
+            switch (combox_sig_com_geo.SelectedIndex)
+            {
+                case 0: // J3E
+                    sig_com = 109;
+                    break;
+                case 1: // FEC - TTY
+                    sig_com = 113;
+                    break;
+                default:
+                    sig_com = 126;
+                    break;
+            }
+            Respuesta.MensajeGeografico(sig_com, canal, 5);
+            combox_sig_com_geo.SelectedIndex = -1;
         }
     }
 }

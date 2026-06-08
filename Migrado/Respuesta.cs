@@ -154,6 +154,11 @@ namespace Dem_v2
             Convertir.ConvertirNumero(127, rta); Convertir.ConvertirNumero(127, rta);
             EOS();
         }
+
+        static public void MensajeGeografico(int sig_com, int canal, int zona)
+        { 
+
+        }
         static public void EOS()
         {
             List<int> phasignseq = new List<int> { 125, 111, 125, 110, 125, 109, 125, 108, 125, 107, 125, 106 }; 
