@@ -51,7 +51,7 @@ public class BFSKDemodulator
         }
         _samplesPerSymbol = (double)SampleRate / (vhf ? 1200 : 100);
 
-        double minRms = short.MaxValue * 0.01;
+        double minRms = short.MaxValue * 0.1; // umbral original: 0.01
         _energyThreshold = minRms * minRms * _samplesPerSymbol;
 
         // Inicializar los 4 acumuladores con offsets distribuidos uniformemente
@@ -141,7 +141,8 @@ public class BFSKDemodulator
                 for (int n = 0; n < length; n++)
                 {
                     int bufIdx = (int)((startAbs + n) % BufSize);
-                    double sample = _buf[bufIdx];
+                    //double window = 0.5 * (1.0 - Math.Cos(2.0 * Math.PI * n / (length - 1))); // ventana Hamming
+                    double sample = _buf[bufIdx]; // * window;   
 
                     // Energía bruta (umbral de portadora)
                     rawE += sample * sample;
@@ -318,7 +319,7 @@ public class BFSKModulator
         var waveFormat = new WaveFormat(sampleRate, 16, 1);
         using var writer = new WaveFileWriter(outputWav, waveFormat);
 
-        double amplitude = 0.25 * short.MaxValue;
+        double amplitude = 0.85 * short.MaxValue; // original 0.25
         double phase = 0.0;  // acumulador de fase continua (radianes)
         double posAccum = 0.0;  // acumulador de posición para timing exacto
 

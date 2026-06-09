@@ -716,7 +716,8 @@ namespace Dem_v2
             string mmsi_tx = string.Empty;
             string primer_tel = string.Empty;
             string segundo_tel = string.Empty;
-            string frec_canal_1 = string.Empty;
+            string frec_canal_1 = string.Empty; string frec_canal_2 = string.Empty;
+            bool canal = false; bool canal2 = false;
             string ack = string.Empty;
             string mmsi_socorro = string.Empty;
             string tipoEmergencia = string.Empty;
@@ -748,7 +749,8 @@ namespace Dem_v2
             else
             {
                 segundo_tel = General.SegundoTelemando(mensaje[28]);
-                frec_canal_1 = General.FrecuenciaCanal(mensaje, 30, out bool _).Item1;
+                (frec_canal_1,_,canal) = General.FrecuenciaCanal(mensaje, 30, out bool _);
+                (frec_canal_2,_,canal2) = General.FrecuenciaCanal(mensaje, 36, out bool _);
                 ack = General.ACK(mensaje[42]);
             }
 
@@ -771,7 +773,24 @@ namespace Dem_v2
             else
             {
                 _log($"Segundo Telemando: {segundo_tel}\n"); _logger.RegistrarCampo("Segundo Telemando", segundo_tel);
-                _log($"Frecuencia: {frec_canal_1}\n"); _logger.RegistrarCampo("Frecuencia", frec_canal_1);
+
+                if (canal)
+                {
+                    _log($"Canal Rx: {frec_canal_1}\n"); _logger.RegistrarCampo("Canal Rx", frec_canal_1);
+                }
+                else
+                {
+                    _log($"Frecuencia Rx: {frec_canal_1}\n"); _logger.RegistrarCampo("Frecuencia Rx", frec_canal_1);
+                }
+                if (canal2)
+                {
+                    _log($"Canal Tx: {frec_canal_2}\n"); _logger.RegistrarCampo("Canal Tx", frec_canal_2);
+                }
+                else
+                {
+                    _log($"Frecuencia Tx: {frec_canal_2}\n"); _logger.RegistrarCampo("Frecuencia Tx", frec_canal_2);
+                }
+
                 _log($"{ack}\n"); _logger.RegistrarCampo("ACK", ack);
             }
 

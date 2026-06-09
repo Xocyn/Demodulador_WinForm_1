@@ -228,7 +228,7 @@ namespace Demodulador_WinForm_1
             const string startPattern = "01010101010101010101"; // 20 bits
 
             Estado estado = Estado.EsperandoInicio;
-            int cooldownMs = 50; //250 andaba
+            int cooldownMs = 100; //250 andaba
             DateTime cooldownHasta = DateTime.MinValue;
 
             // ── Detector de silencio ─────────────────────────────────────────────

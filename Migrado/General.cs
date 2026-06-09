@@ -165,7 +165,7 @@ namespace Dem_v2
                 case 0:
                 case 1:
                 case 2:
-                    frec_canal = $"{mensaje_separado[0]}{mensaje_separado[1]}{mensaje_separado[2]}{mensaje_separado[3]}{mensaje_separado[4]}.{mensaje_separado[5]}kHz";
+                    frec_canal = $"{mensaje_separado[0]}{mensaje_separado[1]}{mensaje_separado[2]}{mensaje_separado[3]}{mensaje_separado[4]}.{mensaje_separado[5]} kHz";
                     break;
                 // CANAL MF/HF
                 case 3:
