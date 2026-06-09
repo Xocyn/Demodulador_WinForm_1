@@ -169,6 +169,19 @@ namespace Demodulador_WinForm_1
                 return;
             }
 
+            // Elevar prioridad del proceso para que el SO asigne más tiempo de CPU
+            // a esta aplicación sobre el resto. High es el máximo seguro —
+            // RealTime puede congelar el sistema operativo completo.
+            try
+            {
+                System.Diagnostics.Process.GetCurrentProcess().PriorityClass =
+                    System.Diagnostics.ProcessPriorityClass.High;
+            }
+            catch (Exception ex)
+            {
+                LogToDisplay($"[Advertencia] No se pudo elevar prioridad del proceso: {ex.Message}\n");
+            }
+
             _isRunning = true;
 
             // ⚠️ IMPORTANTE: Crear un NUEVO CancellationTokenSource para cada captura
@@ -205,7 +218,7 @@ namespace Demodulador_WinForm_1
                 updateIntervalMs: 50      // Actualizar cada 50ms (~20 FPS)
             );
 
-            const int PhaseCount = 2;
+            const int PhaseCount = 4; // 2 anda joya
             var syncBuffers = new StringBuilder[PhaseCount];
             for (int p = 0; p < PhaseCount; p++) syncBuffers[p] = new StringBuilder();
 
@@ -213,9 +226,9 @@ namespace Demodulador_WinForm_1
             StringBuilder bitAccumulator = new StringBuilder();
 
             const string startPattern = "01010101010101010101"; // 20 bits
-          
+
             Estado estado = Estado.EsperandoInicio;
-            int cooldownMs = 100; //250 andaba
+            int cooldownMs = 50; //250 andaba
             DateTime cooldownHasta = DateTime.MinValue;
 
             // ── Detector de silencio ─────────────────────────────────────────────
@@ -235,6 +248,11 @@ namespace Demodulador_WinForm_1
             // Consume mensajes de la cola y llama a ProcesarBits sin tocar el thread de audio.
             _processingThread = new Thread(() =>
             {
+                // TimeCritical es la prioridad más alta disponible para un thread de usuario.
+                // Garantiza que el dequeue y el Procesar() no sean desalojados por threads
+                // de menor prioridad (UI, logger, etc.) mientras hay mensajes pendientes.
+                Thread.CurrentThread.Priority = ThreadPriority.Highest;
+
                 while (!_cts.Token.IsCancellationRequested)
                 {
                     if (_mensajesCapturados.TryDequeue(out string bits))
@@ -414,6 +432,12 @@ namespace Demodulador_WinForm_1
 
             LogToDisplay("\nEscuchando...\n");
             _waveIn.StartRecording();
+
+            // El thread interno de NAudio que dispara DataAvailable no es accesible
+            // directamente, pero WaveInEvent usa un thread del ThreadPool con prioridad
+            // Normal. Subir el thread de la aplicación a High (proceso) ya le da ventaja
+            // frente al resto del sistema. Para el callback en sí, NAudio respeta la
+            // prioridad del proceso, así que este ajuste es suficiente.
         }
 
         public void DetenerCaptura()
@@ -432,6 +456,14 @@ namespace Demodulador_WinForm_1
 
             // Esperar a que el thread de procesamiento termine
             _processingThread?.Join(2000);
+
+            // Restaurar prioridad del proceso a Normal al detener la captura
+            try
+            {
+                System.Diagnostics.Process.GetCurrentProcess().PriorityClass =
+                    System.Diagnostics.ProcessPriorityClass.Normal;
+            }
+            catch { }
 
             // Limpiar recursos
             _waveIn?.Dispose();

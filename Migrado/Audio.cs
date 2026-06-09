@@ -1,4 +1,4 @@
-﻿using NAudio.Wave;
+using NAudio.Wave;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -12,17 +12,30 @@ public class BFSKDemodulator
     private readonly double _samplesPerSymbol;
     private readonly double _energyThreshold;
 
-    // Buffer compartido de muestras
-    private readonly List<short> _sampleBuffer = new List<short>();
+    // ── Buffer circular de muestras ───────────────────────────────────────────
+    // Array de tamaño fijo en lugar de List<short>:
+    //   · Elimina RemoveRange(0, n) que era O(n) y movía toda la memoria en cada callback.
+    //   · _writePos apunta al próximo slot de escritura (módulo BufSize).
+    //   · _totalSamples es el contador absoluto de muestras escritas desde el inicio.
+    //   · Los acumuladores guardan posición absoluta; se mapean a _buf con % BufSize.
+    private const int BufSize = 8192; // ~185ms a 44100Hz, potencia de 2
+    private readonly short[] _buf = new short[BufSize];
+    private int _writePos = 0;
+    private long _totalSamples = 0;
 
     // ── 4 fases en paralelo ───────────────────────────────────────────────────
-    // offsets: 0, spb/4, spb/2, 3*spb/4
-    // Garantiza que siempre al menos una fase tenga offset < 32% del símbolo
-    // (zona donde los bits en transición son correctos).
     private const int PhaseCount = 4;
     private readonly double[] _accumulators = new double[PhaseCount];
-    private int _activePhase = -1; // -1 = modo detección (todas activas)
+    private int _activePhase = -1;
     private bool _phaseLocked = false;
+
+    // ── Coeficientes de Goertzel precalculados ────────────────────────────────
+    // coeff = 2·cos(2π·f/Fs) — se calcula una vez en el constructor.
+    // phaseInc = 2π·f/Fs — para la corrección de fase con índice absoluto.
+    private double _goertzelCoeff0;
+    private double _goertzelCoeff1;
+    private double _phaseInc0;
+    private double _phaseInc1;
 
     public BFSKDemodulator(bool vhf = false)
     {
@@ -44,6 +57,12 @@ public class BFSKDemodulator
         // Inicializar los 4 acumuladores con offsets distribuidos uniformemente
         for (int p = 0; p < PhaseCount; p++)
             _accumulators[p] = p * (_samplesPerSymbol / PhaseCount);
+
+        // Precomputar coeficientes de Goertzel y fases — una sola vez para toda la vida del objeto
+        _phaseInc0 = 2.0 * Math.PI * _freqBit0 / SampleRate;
+        _phaseInc1 = 2.0 * Math.PI * _freqBit1 / SampleRate;
+        _goertzelCoeff0 = 2.0 * Math.Cos(_phaseInc0);
+        _goertzelCoeff1 = 2.0 * Math.Cos(_phaseInc1);
     }
 
     // ── ResetTiming: volver a modo detección con 4 fases ─────────────────────
@@ -51,9 +70,11 @@ public class BFSKDemodulator
     {
         _phaseLocked = false;
         _activePhase = -1;
-        _sampleBuffer.Clear();
+        // No se limpia _buf ni _totalSamples: el buffer circular simplemente
+        // se sobreescribe. Los acumuladores se reinician a posición absoluta
+        // actual + offset de fase, para que arranquen alineados al stream real.
         for (int p = 0; p < PhaseCount; p++)
-            _accumulators[p] = p * (_samplesPerSymbol / PhaseCount);
+            _accumulators[p] = _totalSamples + p * (_samplesPerSymbol / PhaseCount);
     }
 
     // ── LockPhase: llamar cuando una fase detectó el dot pattern ─────────────
@@ -61,44 +82,100 @@ public class BFSKDemodulator
     {
         _activePhase = phaseIndex;
         _phaseLocked = true;
+        // Los otros acumuladores se abandonan; solo el de la fase activa sigue avanzando.
+        // No es necesario resetear _totalSamples ni _buf: el circular sigue funcionando.
     }
 
     // ── ProcessAudio ─────────────────────────────────────────────────────────
-    // En modo detección: retorna bits de las 4 fases → string[4]
-    // En modo bloqueado: retorna bits solo de la fase activa → string[0] con contenido
-    // Program.cs usa el índice 'activePhase' para separar los bits.
+    // Mejoras respecto a la versión anterior:
+    //   1. WaveBuffer de NAudio: acceso directo a short[] sin copiar ni convertir.
+    //   2. Buffer circular _buf[BufSize]: escritura O(1), sin RemoveRange O(n).
+    //   3. Goertzel con índice absoluto: un solo loop por símbolo calcula e0 y e1
+    //      simultáneamente, con fase coherente con la posición real en el stream.
+    //   4. Energía bruta, e0 y e1 en el mismo loop: 1 pasada en vez de 3.
     public string[] ProcessAudio(byte[] buffer, int bytesRecorded)
     {
-        // Agregar muestras al buffer compartido
-        int samples = bytesRecorded / 2;
-        for (int i = 0; i < samples; i++)
-            _sampleBuffer.Add(BitConverter.ToInt16(buffer, i * 2));
+        // WaveBuffer expone el byte[] de NAudio como ShortBuffer sin ninguna copia.
+        var wb = new WaveBuffer(buffer);
+        int sampleCount = bytesRecorded / 2;
+
+        // Escribir muestras en el buffer circular
+        for (int i = 0; i < sampleCount; i++)
+        {
+            _buf[_writePos] = wb.ShortBuffer[i];
+            _writePos = (_writePos + 1) % BufSize;
+            _totalSamples++;
+        }
 
         var results = new StringBuilder[PhaseCount];
         for (int p = 0; p < PhaseCount; p++)
             results[p] = new StringBuilder();
 
         int pStart = _phaseLocked ? _activePhase : 0;
-        int pEnd = _phaseLocked ? _activePhase + 1 : PhaseCount;
+        int pEnd   = _phaseLocked ? _activePhase + 1 : PhaseCount;
 
         for (int p = pStart; p < pEnd; p++)
         {
-            while (_accumulators[p] + _samplesPerSymbol <= _sampleBuffer.Count)
+            while (_accumulators[p] + _samplesPerSymbol <= _totalSamples)
             {
-                int start = (int)Math.Round(_accumulators[p]);
-                int end = (int)Math.Round(_accumulators[p] + _samplesPerSymbol);
-                int length = end - start;
+                // startAbs y endAbs son índices absolutos de muestra
+                long startAbs = (long)Math.Round(_accumulators[p]);
+                long endAbs   = (long)Math.Round(_accumulators[p] + _samplesPerSymbol);
+                int  length   = (int)(endAbs - startAbs);
 
-                if (start < 0 || start + length > _sampleBuffer.Count) break;
+                // Verificar que las muestras siguen en el buffer circular
+                if (_totalSamples - startAbs > BufSize) { _accumulators[p] += _samplesPerSymbol; continue; }
+                if (endAbs > _totalSamples) break;
 
+                // ── Un solo loop: energía bruta + Goertzel f0 + Goertzel f1 ──────
+                // Goertzel con corrección de fase absoluta:
+                //   La señal fue generada con fase continua desde muestra 0.
+                //   Usar startAbs como origen garantiza que el correlador evalúa
+                //   exactamente la misma fase que el modulador usó para ese símbolo.
+                //   Sin esto, los símbolos de 36 vs 37 muestras producen un error
+                //   de fase que puede invertir la decisión 0/1 aleatoriamente.
                 double rawE = 0;
+                double s0_0 = 0, s1_0 = 0, s2_0 = 0; // estado Goertzel f0
+                double s0_1 = 0, s1_1 = 0, s2_1 = 0; // estado Goertzel f1
+
                 for (int n = 0; n < length; n++)
-                    rawE += (double)_sampleBuffer[start + n] * _sampleBuffer[start + n];
+                {
+                    int bufIdx = (int)((startAbs + n) % BufSize);
+                    double sample = _buf[bufIdx];
+
+                    // Energía bruta (umbral de portadora)
+                    rawE += sample * sample;
+
+                    // Goertzel f0
+                    s0_0 = sample + _goertzelCoeff0 * s1_0 - s2_0;
+                    s2_0 = s1_0; s1_0 = s0_0;
+
+                    // Goertzel f1
+                    s0_1 = sample + _goertzelCoeff1 * s1_1 - s2_1;
+                    s2_1 = s1_1; s1_1 = s0_1;
+                }
 
                 if (rawE >= _energyThreshold)
                 {
-                    double e0 = EnergyIQ(_sampleBuffer, start, length, _freqBit0);
-                    double e1 = EnergyIQ(_sampleBuffer, start, length, _freqBit1);
+                    // Energía espectral Goertzel: s1²+s2²−coeff·s1·s2
+                    // Corrección de fase absoluta: rotar el fasor resultante por
+                    // la fase acumulada hasta el inicio del símbolo, para que la
+                    // comparación e0 vs e1 sea coherente entre símbolos consecutivos.
+                    double phase0 = _phaseInc0 * startAbs;
+                    double phase1 = _phaseInc1 * startAbs;
+
+                    double e0 = (s1_0 * s1_0) + (s2_0 * s2_0) - (_goertzelCoeff0 * s1_0 * s2_0);
+                    double e1 = (s1_1 * s1_1) + (s2_1 * s2_1) - (_goertzelCoeff1 * s1_1 * s2_1);
+
+                    // Ajuste de fase: proyectar sobre el fasor esperado
+                    double I0 = s1_0 * Math.Cos(phase0) - s2_0 * Math.Cos(phase0 - _phaseInc0);
+                    double Q0 = s1_0 * Math.Sin(phase0) - s2_0 * Math.Sin(phase0 - _phaseInc0);
+                    double I1 = s1_1 * Math.Cos(phase1) - s2_1 * Math.Cos(phase1 - _phaseInc1);
+                    double Q1 = s1_1 * Math.Sin(phase1) - s2_1 * Math.Sin(phase1 - _phaseInc1);
+
+                    e0 = I0 * I0 + Q0 * Q0;
+                    e1 = I1 * I1 + Q1 * Q1;
+
                     results[p].Append(e1 > e0 ? '1' : '0');
                 }
 
@@ -106,19 +183,8 @@ public class BFSKDemodulator
             }
         }
 
-        // Purgar muestras ya consumidas por TODAS las fases activas
-        double minAcc = double.MaxValue;
-        for (int p = pStart; p < pEnd; p++)
-            if (_accumulators[p] < minAcc) minAcc = _accumulators[p];
-
-        int consumed = (int)Math.Floor(minAcc);
-        if (consumed > 0 && consumed <= _sampleBuffer.Count)
-        {
-            _sampleBuffer.RemoveRange(0, consumed);
-            for (int p = 0; p < PhaseCount; p++)
-                _accumulators[p] -= consumed;
-        }
-
+        // No hay RemoveRange: el buffer circular se sobreescribe naturalmente.
+        // Los acumuladores mantienen posición absoluta; no hay offset que restar.
         return results.Select(sb => sb.ToString()).ToArray();
     }
 
@@ -181,38 +247,21 @@ public class BFSKDemodulator
     }
 
     // ── Correladores ─────────────────────────────────────────────────────────
+    // EnergyIQ y EnergyIQ_2 ya no se usan en ProcessAudio (reemplazados por
+    // Goertzel inline con índice absoluto). Se conservan solo para DemodulateToString
+    // que opera sobre archivos WAV donde el timing recovery es diferente.
     private static double EnergyIQ(List<short> s, int start, int length, double freq)
     {
         double I = 0, Q = 0;
+        double phaseInc = 2.0 * Math.PI * freq / SampleRate;
         for (int n = 0; n < length; n++)
         {
-            double t = (double)n / SampleRate;
-            I += s[start + n] * Math.Cos(2 * Math.PI * freq * t); // FASE
-            Q += s[start + n] * Math.Sin(2 * Math.PI * freq * t); // CUADRATURA
+            // Índice absoluto: fase coherente con la posición real en el stream
+            double phase = phaseInc * (start + n);
+            I += s[start + n] * Math.Cos(phase);
+            Q += s[start + n] * Math.Sin(phase);
         }
         return I * I + Q * Q;
-    }
-    private static double EnergyIQ_2(List<short> s, int start, int length, double freq)
-    {
-        // Pre-cálculo de coeficientes para la frecuencia objetivo
-        double omega = 2.0 * Math.PI * freq / SampleRate;
-        double coeff = 2.0 * Math.Cos(omega);
-
-        double s1 = 0.0;
-        double s2 = 0.0;
-
-        for (int n = 0; n < length; n++)
-        {
-            double sample = s[start + n];
-
-            // Ecuación en diferencias de Goertzel
-            double s0 = sample + coeff * s1 - s2;
-            s2 = s1;
-            s1 = s0;
-        }
-
-        // Cálculo final de la magnitud al cuadrado (equivalente a I^2 + Q^2)
-        return (s1 * s1) + (s2 * s2) - (coeff * s1 * s2);
     }
 
     private static (double e0, double e1) EnergyIQStatic(short[] s, int start, int length, double f0, double f1)
