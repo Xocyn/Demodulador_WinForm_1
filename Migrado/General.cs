@@ -133,6 +133,7 @@ namespace Dem_v2
             bool ocho_caracteres = false;
             bool canal = false;
             posicion = false;
+            string b_c_rr = string.Empty; 
             List<int> mensaje_canal = new List<int>();
 
 
@@ -183,8 +184,15 @@ namespace Dem_v2
                     canal = true;
                     break;
                 // CANAL DE RECEPCIÓN VHF
-                case 9: 
-                    frec_canal = $"{mensaje_separado[1]}{mensaje_separado[2]}{mensaje_separado[3]}{mensaje_separado[4]}{mensaje_separado[5]}";
+                case 9:
+                    if (mensaje_separado[2]==0)
+                        b_c_rr = "RR";
+                    else if (mensaje_separado[2] == 1)
+                        b_c_rr = "Barco";
+                    else if (mensaje_separado[2] == 2)
+                        b_c_rr = "Costera";
+
+                    frec_canal = $"{b_c_rr}: {mensaje_separado[3]}{mensaje_separado[4]}{mensaje_separado[5]}";
                     canal = true;
                     break;
                 default:

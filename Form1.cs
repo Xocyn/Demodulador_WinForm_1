@@ -12,6 +12,8 @@ namespace Demodulador_WinForm_1
         private CapturaDatos _capturaDatos;
         private bool _isCapturing = false;
         private readonly Procesamiento _procesamiento;
+        private int _mensajesRecibidosTotal = 0;
+        private int _mensajesCorrectosTotal = 0;
         public bool vhf => combox_hf_vhf.SelectedIndex == 1;
         public Demodulador_DSC()
         {
@@ -39,10 +41,7 @@ namespace Demodulador_WinForm_1
 
             this.FormClosing += (s, e) =>
             {
-                if (_isCapturing)
-                {
-                    _capturaDatos.DetenerCaptura();
-                }
+                DetenerCapturaDesdeUi(pedirConfirmacion: false);
             };
         }
 
@@ -101,6 +100,37 @@ namespace Demodulador_WinForm_1
                 dataGridView1.Rows.Insert(0, formato, categoria, hora, ecc, rta);
             }
         }
+
+        public void RegistrarMensajeRecibido()
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(() => RegistrarMensajeRecibido());
+                return;
+            }
+
+            _mensajesRecibidosTotal++;
+            ActualizarContadoresMensajes();
+        }
+
+        public void RegistrarMensajeCorrecto()
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke(() => RegistrarMensajeCorrecto());
+                return;
+            }
+
+            _mensajesCorrectosTotal++;
+            ActualizarContadoresMensajes();
+        }
+
+        private void ActualizarContadoresMensajes()
+        {
+            label_mensajes_total_valor.Text = _mensajesRecibidosTotal.ToString();
+            label_mensajes_correctos_valor.Text = _mensajesCorrectosTotal.ToString();
+        }
+
         private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex < 0) return;
@@ -128,7 +158,7 @@ namespace Demodulador_WinForm_1
                 ventana.Show();
             }
 
-            if (dataGridView1.Columns[e.ColumnIndex].Name == "rta_msg")
+            if (dataGridView1.Columns[e.ColumnIndex].Name == "rta_msg" && msg.Formato == 112)
             {
                 var ventana_ack_rtx = new ack_rtx(msg);
                 ventana_ack_rtx.Show();
@@ -137,16 +167,28 @@ namespace Demodulador_WinForm_1
 
         private void detener_Click(object sender, EventArgs e)
         {
-            DialogResult resultado = MessageBox.Show(
-             "¿DETENER LA CAPTURA DE DATOS?",
-             "",
-             MessageBoxButtons.YesNo,
-             MessageBoxIcon.Warning
-            );
+            DetenerCapturaDesdeUi(pedirConfirmacion: true);
+        }
 
-            if (resultado == DialogResult.Yes)
+        private void DetenerCapturaDesdeUi(bool pedirConfirmacion)
+        {
+            if (pedirConfirmacion)
+            {
+                DialogResult resultado = MessageBox.Show(
+                 "¿DETENER LA CAPTURA DE DATOS?",
+                 "",
+                 MessageBoxButtons.YesNo,
+                 MessageBoxIcon.Warning
+                );
+
+                if (resultado != DialogResult.Yes)
+                    return;
+            }
+
+            if (_isCapturing)
             {
                 _capturaDatos.END();
+                _isCapturing = false;
             }
         }
 

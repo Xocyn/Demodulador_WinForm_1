@@ -17,6 +17,7 @@ namespace Demodulador_WinForm_1.Ventana_rtx_ack
         private readonly Mensaje _mensaje;
         private CapturaDatos _capturaDatos;
         private readonly Procesamiento _procesamiento;
+        bool rtx = false;
         public ack_rtx(Mensaje msg)
         {
             InitializeComponent();
@@ -28,12 +29,16 @@ namespace Demodulador_WinForm_1.Ventana_rtx_ack
 
         private void btn_ack_Click(object sender, EventArgs e)
         {
-            Respuesta.Decidir(_mensaje);
+            rtx = false;
+            Respuesta.Decidir(_mensaje, rtx);
             _capturaDatos.Resume();
         }
 
         private void btn_rtx_Click(object sender, EventArgs e)
         {
+            rtx = true;
+            Respuesta.Decidir(_mensaje, rtx);
+            _capturaDatos.Resume();
 
         }
     }

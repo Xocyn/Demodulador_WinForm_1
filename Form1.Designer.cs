@@ -47,11 +47,17 @@
             rta_msg = new DataGridViewButtonColumn();
             detener = new Button();
             enviar_btn = new Button();
+            contador_group = new GroupBox();
+            label_mensajes_total = new Label();
+            label_mensajes_total_valor = new Label();
+            label_mensajes_correctos = new Label();
+            label_mensajes_correctos_valor = new Label();
             ((System.ComponentModel.ISupportInitialize)splitContainer1).BeginInit();
             splitContainer1.Panel1.SuspendLayout();
             splitContainer1.Panel2.SuspendLayout();
             splitContainer1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView1).BeginInit();
+            contador_group.SuspendLayout();
             SuspendLayout();
             // 
             // label_banda
@@ -226,11 +232,63 @@
             enviar_btn.UseVisualStyleBackColor = false;
             enviar_btn.Click += enviar_btn_Click;
             // 
+            // contador_group
+            // 
+            contador_group.Controls.Add(label_mensajes_correctos_valor);
+            contador_group.Controls.Add(label_mensajes_correctos);
+            contador_group.Controls.Add(label_mensajes_total_valor);
+            contador_group.Controls.Add(label_mensajes_total);
+            contador_group.Location = new Point(42, 160);
+            contador_group.Name = "contador_group";
+            contador_group.Size = new Size(312, 98);
+            contador_group.TabIndex = 9;
+            contador_group.TabStop = false;
+            contador_group.Text = "Mensajes";
+            // 
+            // label_mensajes_total
+            // 
+            label_mensajes_total.AutoSize = true;
+            label_mensajes_total.Location = new Point(16, 30);
+            label_mensajes_total.Name = "label_mensajes_total";
+            label_mensajes_total.Size = new Size(143, 20);
+            label_mensajes_total.TabIndex = 0;
+            label_mensajes_total.Text = "Recibidos totales:";
+            // 
+            // label_mensajes_total_valor
+            // 
+            label_mensajes_total_valor.AutoSize = true;
+            label_mensajes_total_valor.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            label_mensajes_total_valor.Location = new Point(184, 30);
+            label_mensajes_total_valor.Name = "label_mensajes_total_valor";
+            label_mensajes_total_valor.Size = new Size(18, 20);
+            label_mensajes_total_valor.TabIndex = 1;
+            label_mensajes_total_valor.Text = "0";
+            // 
+            // label_mensajes_correctos
+            // 
+            label_mensajes_correctos.AutoSize = true;
+            label_mensajes_correctos.Location = new Point(16, 62);
+            label_mensajes_correctos.Name = "label_mensajes_correctos";
+            label_mensajes_correctos.Size = new Size(84, 20);
+            label_mensajes_correctos.TabIndex = 2;
+            label_mensajes_correctos.Text = "Correctos:";
+            // 
+            // label_mensajes_correctos_valor
+            // 
+            label_mensajes_correctos_valor.AutoSize = true;
+            label_mensajes_correctos_valor.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+            label_mensajes_correctos_valor.Location = new Point(184, 62);
+            label_mensajes_correctos_valor.Name = "label_mensajes_correctos_valor";
+            label_mensajes_correctos_valor.Size = new Size(18, 20);
+            label_mensajes_correctos_valor.TabIndex = 3;
+            label_mensajes_correctos_valor.Text = "0";
+            // 
             // Demodulador_DSC
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1924, 990);
+            Controls.Add(contador_group);
             Controls.Add(enviar_btn);
             Controls.Add(detener);
             Controls.Add(dataGridView1);
@@ -250,6 +308,8 @@
             ((System.ComponentModel.ISupportInitialize)splitContainer1).EndInit();
             splitContainer1.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)dataGridView1).EndInit();
+            contador_group.ResumeLayout(false);
+            contador_group.PerformLayout();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -274,5 +334,10 @@
         private DataGridViewButtonColumn see_msg;
         private DataGridViewButtonColumn rta_msg;
         private Button enviar_btn;
+        private GroupBox contador_group;
+        private Label label_mensajes_total;
+        private Label label_mensajes_total_valor;
+        private Label label_mensajes_correctos;
+        private Label label_mensajes_correctos_valor;
     }
 }

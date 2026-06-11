@@ -275,7 +275,8 @@ namespace Dem_v2
 
                 LogToDisplay("\n");
 
-                _form.AgregarFila(formatoMensaje, MSG.categoria, MSG.Fecha_recepcion.ToString("HH:mm:ss"), "CHECK", MSG.ack);
+                _form?.AgregarFila(formatoMensaje, MSG.categoria, MSG.Fecha_recepcion.ToString("HH:mm:ss"), "CHECK", MSG.ack);
+                _form?.RegistrarMensajeCorrecto();
                 MSG.extension = extension;
                 List<int> M_E_M = MENSAJE_EXT.ToList(); // sino duplicaba se rompia
                 MSG.Mensaje_ext = (extension && ecc_ext) ? M_E_M : null;

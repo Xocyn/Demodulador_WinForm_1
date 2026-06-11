@@ -2,6 +2,7 @@ using NAudio.Wave;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Runtime.InteropServices;
 
 public class BFSKDemodulator
 {
@@ -95,14 +96,19 @@ public class BFSKDemodulator
     //   4. Energía bruta, e0 y e1 en el mismo loop: 1 pasada en vez de 3.
     public string[] ProcessAudio(byte[] buffer, int bytesRecorded)
     {
-        // WaveBuffer expone el byte[] de NAudio como ShortBuffer sin ninguna copia.
-        var wb = new WaveBuffer(buffer);
-        int sampleCount = bytesRecorded / 2;
+        // WaveBuffer requiere que el array tenga longitud múltiplo de 4 para que
+        // los offsets de la union sean correctos. El buffer copiado en CapturaDatos
+        // tiene exactamente bytesRecorded bytes, que puede no ser múltiplo de 4.
+        // MemoryMarshal.Cast es la alternativa segura: reinterpreta el span de bytes
+        // como span de shorts sin ninguna copia y sin restricciones de alineación.
+        var samples = MemoryMarshal.Cast<byte, short>(
+            buffer.AsSpan(0, bytesRecorded));
+        int sampleCount = samples.Length;
 
         // Escribir muestras en el buffer circular
         for (int i = 0; i < sampleCount; i++)
         {
-            _buf[_writePos] = wb.ShortBuffer[i];
+            _buf[_writePos] = samples[i];
             _writePos = (_writePos + 1) % BufSize;
             _totalSamples++;
         }
@@ -112,7 +118,7 @@ public class BFSKDemodulator
             results[p] = new StringBuilder();
 
         int pStart = _phaseLocked ? _activePhase : 0;
-        int pEnd   = _phaseLocked ? _activePhase + 1 : PhaseCount;
+        int pEnd = _phaseLocked ? _activePhase + 1 : PhaseCount;
 
         for (int p = pStart; p < pEnd; p++)
         {
@@ -120,8 +126,8 @@ public class BFSKDemodulator
             {
                 // startAbs y endAbs son índices absolutos de muestra
                 long startAbs = (long)Math.Round(_accumulators[p]);
-                long endAbs   = (long)Math.Round(_accumulators[p] + _samplesPerSymbol);
-                int  length   = (int)(endAbs - startAbs);
+                long endAbs = (long)Math.Round(_accumulators[p] + _samplesPerSymbol);
+                int length = (int)(endAbs - startAbs);
 
                 // Verificar que las muestras siguen en el buffer circular
                 if (_totalSamples - startAbs > BufSize) { _accumulators[p] += _samplesPerSymbol; continue; }

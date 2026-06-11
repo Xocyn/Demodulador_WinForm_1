@@ -282,7 +282,6 @@ namespace Demodulador_WinForm_1
                 // Estado local del thread — mismo código que estaba en DataAvailable,
                 // sin ningún cambio de lógica.
                 const int PhaseCount = 4;
-                const int CaptureSampleRate = 44100;
                 var syncBuffers = new StringBuilder[PhaseCount];
                 for (int p = 0; p < PhaseCount; p++) syncBuffers[p] = new StringBuilder();
 
@@ -291,8 +290,7 @@ namespace Demodulador_WinForm_1
                 const string startPattern = "01010101010101010101";
                 Estado estado = Estado.EsperandoInicio;
                 int cooldownMs = 100;
-                int cooldownSamplesTotal = (int)Math.Ceiling(CaptureSampleRate * cooldownMs / 1000.0);
-                int cooldownSamplesRemaining = 0;
+                DateTime cooldownHasta = DateTime.MinValue;
                 double umbralEnergiaPorMuestra = Math.Pow(short.MaxValue * 0.01, 2);
                 double silencioRequeridoMs = vhfMode ? 300.0 : 800.0;
                 var silenceDetector = new SilenceDetector(umbralEnergiaPorMuestra, silencioRequeridoMs);
@@ -331,40 +329,36 @@ namespace Demodulador_WinForm_1
                             processedBlocks++;
                             maxQueueDepth = Math.Max(maxQueueDepth, _audioQueue?.Count ?? 0);
                             maxQueueLatencyTicks = Math.Max(maxQueueLatencyTicks, blockStartTicks - captureTicks);
-                            int blockSampleCount = bytesRecorded / 2;
 
                             // ── Visualización de onda ─────────────────────────────────────
                             if (bytesRecorded > 0)
                             {
-                                short[] samples = new short[blockSampleCount];
+                                int sampleCount = bytesRecorded / 2;
+                                short[] samples = new short[sampleCount];
                                 Buffer.BlockCopy(buffer, 0, samples, 0, bytesRecorded);
                                 UpdateWaveDisplay(samples);
                             }
 
+                            string[] bitsByPhase;
+
+                            bitsByPhase = _demod.ProcessAudio(buffer, bytesRecorded);
+
+
                             // ── Cooldown ──────────────────────────────────────────────────
+
                             if (estado == Estado.Cooldown)
                             {
-                                // El cooldown debe avanzar con el audio procesado, no con el
-                                // reloj de pared. Alimentamos el demodulador para mantener su
-                                // contador de muestras, pero ignoramos los bits de este periodo.
-                                _demod.ProcessAudio(buffer, bytesRecorded);
-                                cooldownSamplesRemaining -= blockSampleCount;
-
-                                if (cooldownSamplesRemaining <= 0)
+                                if (DateTime.Now > cooldownHasta)
                                 {
-                                    LogToDisplay($"Cooldown terminado ({cooldownMs} ms de audio). Escuchando...");
+                                    LogToDisplay("Cooldown terminado. Escuchando...");
                                     estado = Estado.EsperandoInicio;
                                     lockedPhase = -1;
                                     _demod.ResetTiming();
                                     silenceDetector.Reset();
-                                    cooldownSamplesRemaining = 0;
                                     for (int p = 0; p < PhaseCount; p++) syncBuffers[p].Clear();
                                 }
-
-                                continue;
+                                else continue;
                             }
-
-                            string[] bitsByPhase = _demod.ProcessAudio(buffer, bytesRecorded);
 
                             // ── PASO 1: Acumular bits del bloque ──────────────────────────
                             int phaseStart, phaseEnd;
@@ -448,7 +442,7 @@ namespace Demodulador_WinForm_1
                                     LogToDisplay("[Advertencia] No se encoló mensaje: cadena vacía");
                                 bitAccumulator.Clear();
                                 estado = Estado.Cooldown;
-                                cooldownSamplesRemaining = cooldownSamplesTotal;
+                                cooldownHasta = DateTime.Now.AddMilliseconds(cooldownMs);
                             }
                         }
                         catch (OperationCanceledException) { break; }
@@ -509,7 +503,6 @@ namespace Demodulador_WinForm_1
                     {
                         try
                         {
-                            _form?.RegistrarMensajeRecibido();
                             _procesamiento.Procesar(bits);
                         }
                         catch (Exception ex)
