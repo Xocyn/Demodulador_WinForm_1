@@ -47,23 +47,17 @@
             rta_msg = new DataGridViewButtonColumn();
             detener = new Button();
             enviar_btn = new Button();
-            group_contadores = new GroupBox();
-            label_recibidos_totales = new Label();
-            label_recibidos_totales_valor = new Label();
-            label_demodulados_correctos = new Label();
-            label_demodulados_correctos_valor = new Label();
-            label_filtro_rx = new Label();
-            num_filtro_rx = new NumericUpDown();
-            button_reiniciar_contador = new Button();
-            label_metodo_demod = new Label();
-            combox_metodo_demod = new ComboBox();
+            contador_group = new GroupBox();
+            label_mensajes_total_titulo = new Label();
+            label_mensajes_total_valor = new Label();
+            label_mensajes_correctos_titulo = new Label();
+            label_mensajes_correctos_valor = new Label();
             ((System.ComponentModel.ISupportInitialize)splitContainer1).BeginInit();
             splitContainer1.Panel1.SuspendLayout();
             splitContainer1.Panel2.SuspendLayout();
             splitContainer1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView1).BeginInit();
-            group_contadores.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)num_filtro_rx).BeginInit();
+            contador_group.SuspendLayout();
             SuspendLayout();
             // 
             // label_banda
@@ -238,120 +232,63 @@
             enviar_btn.UseVisualStyleBackColor = false;
             enviar_btn.Click += enviar_btn_Click;
             // 
-            // group_contadores
+            // contador_group
             // 
-            group_contadores.Controls.Add(label_demodulados_correctos_valor);
-            group_contadores.Controls.Add(label_demodulados_correctos);
-            group_contadores.Controls.Add(label_recibidos_totales_valor);
-            group_contadores.Controls.Add(label_recibidos_totales);
-            group_contadores.Controls.Add(button_reiniciar_contador);
-            group_contadores.Location = new Point(42, 154);
-            group_contadores.Name = "group_contadores";
-            group_contadores.Size = new Size(376, 158);
-            group_contadores.TabIndex = 9;
-            group_contadores.TabStop = false;
-            group_contadores.Text = "Mensajes";
+            contador_group.Controls.Add(label_mensajes_total_titulo);
+            contador_group.Controls.Add(label_mensajes_total_valor);
+            contador_group.Controls.Add(label_mensajes_correctos_titulo);
+            contador_group.Controls.Add(label_mensajes_correctos_valor);
+            contador_group.Location = new Point(42, 170);
+            contador_group.Name = "contador_group";
+            contador_group.Size = new Size(360, 118);
+            contador_group.TabIndex = 9;
+            contador_group.TabStop = false;
+            contador_group.Text = "Mensajes";
             // 
-            // label_recibidos_totales
+            // label_mensajes_total_titulo
             // 
-            label_recibidos_totales.AutoSize = true;
-            label_recibidos_totales.Location = new Point(22, 38);
-            label_recibidos_totales.Name = "label_recibidos_totales";
-            label_recibidos_totales.Size = new Size(122, 20);
-            label_recibidos_totales.TabIndex = 0;
-            label_recibidos_totales.Text = "Recibidos totales:";
+            label_mensajes_total_titulo.AutoSize = true;
+            label_mensajes_total_titulo.Location = new Point(18, 34);
+            label_mensajes_total_titulo.Name = "label_mensajes_total_titulo";
+            label_mensajes_total_titulo.Size = new Size(121, 20);
+            label_mensajes_total_titulo.TabIndex = 0;
+            label_mensajes_total_titulo.Text = "Recibidos totales:";
             // 
-            // label_recibidos_totales_valor
+            // label_mensajes_total_valor
             // 
-            label_recibidos_totales_valor.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-            label_recibidos_totales_valor.Location = new Point(268, 33);
-            label_recibidos_totales_valor.Name = "label_recibidos_totales_valor";
-            label_recibidos_totales_valor.Size = new Size(65, 28);
-            label_recibidos_totales_valor.TabIndex = 1;
-            label_recibidos_totales_valor.Text = "0";
-            label_recibidos_totales_valor.TextAlign = ContentAlignment.MiddleRight;
+            label_mensajes_total_valor.AutoSize = true;
+            label_mensajes_total_valor.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            label_mensajes_total_valor.Location = new Point(265, 28);
+            label_mensajes_total_valor.Name = "label_mensajes_total_valor";
+            label_mensajes_total_valor.Size = new Size(24, 28);
+            label_mensajes_total_valor.TabIndex = 1;
+            label_mensajes_total_valor.Text = "0";
             // 
-            // label_demodulados_correctos
+            // label_mensajes_correctos_titulo
             // 
-            label_demodulados_correctos.AutoSize = true;
-            label_demodulados_correctos.Location = new Point(22, 77);
-            label_demodulados_correctos.Name = "label_demodulados_correctos";
-            label_demodulados_correctos.Size = new Size(166, 20);
-            label_demodulados_correctos.TabIndex = 2;
-            label_demodulados_correctos.Text = "Demodulados correctos:";
+            label_mensajes_correctos_titulo.AutoSize = true;
+            label_mensajes_correctos_titulo.Location = new Point(18, 75);
+            label_mensajes_correctos_titulo.Name = "label_mensajes_correctos_titulo";
+            label_mensajes_correctos_titulo.Size = new Size(181, 20);
+            label_mensajes_correctos_titulo.TabIndex = 2;
+            label_mensajes_correctos_titulo.Text = "Demodulados correctos:";
             // 
-            // label_demodulados_correctos_valor
+            // label_mensajes_correctos_valor
             // 
-            label_demodulados_correctos_valor.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
-            label_demodulados_correctos_valor.Location = new Point(268, 72);
-            label_demodulados_correctos_valor.Name = "label_demodulados_correctos_valor";
-            label_demodulados_correctos_valor.Size = new Size(65, 28);
-            label_demodulados_correctos_valor.TabIndex = 3;
-            label_demodulados_correctos_valor.Text = "0";
-            label_demodulados_correctos_valor.TextAlign = ContentAlignment.MiddleRight;
-            // 
-            // button_reiniciar_contador
-            // 
-            button_reiniciar_contador.Location = new Point(22, 113);
-            button_reiniciar_contador.Name = "button_reiniciar_contador";
-            button_reiniciar_contador.Size = new Size(166, 29);
-            button_reiniciar_contador.TabIndex = 4;
-            button_reiniciar_contador.Text = "Reiniciar contador";
-            button_reiniciar_contador.UseVisualStyleBackColor = true;
-            button_reiniciar_contador.Click += button_reiniciar_contador_Click;
-            // 
-            // label_filtro_rx
-            // 
-            label_filtro_rx.AutoSize = true;
-            label_filtro_rx.Location = new Point(42, 340);
-            label_filtro_rx.Name = "label_filtro_rx";
-            label_filtro_rx.Size = new Size(128, 20);
-            label_filtro_rx.TabIndex = 10;
-            label_filtro_rx.Text = "Pasabajos RX Hz:";
-            // 
-            // num_filtro_rx
-            // 
-            num_filtro_rx.Increment = new decimal(new int[] { 100, 0, 0, 0 });
-            num_filtro_rx.Location = new Point(176, 338);
-            num_filtro_rx.Maximum = new decimal(new int[] { 8000, 0, 0, 0 });
-            num_filtro_rx.Minimum = new decimal(new int[] { 500, 0, 0, 0 });
-            num_filtro_rx.Name = "num_filtro_rx";
-            num_filtro_rx.Size = new Size(122, 27);
-            num_filtro_rx.TabIndex = 11;
-            num_filtro_rx.TextAlign = HorizontalAlignment.Right;
-            num_filtro_rx.Value = new decimal(new int[] { 3000, 0, 0, 0 });
-            // 
-            // label_metodo_demod
-            // 
-            label_metodo_demod.AutoSize = true;
-            label_metodo_demod.Location = new Point(42, 384);
-            label_metodo_demod.Name = "label_metodo_demod";
-            label_metodo_demod.Size = new Size(101, 20);
-            label_metodo_demod.TabIndex = 12;
-            label_metodo_demod.Text = "Demodulador:";
-            // 
-            // combox_metodo_demod
-            // 
-            combox_metodo_demod.DropDownStyle = ComboBoxStyle.DropDownList;
-            combox_metodo_demod.FormattingEnabled = true;
-            combox_metodo_demod.Items.AddRange(new object[] { "Actual", "Correlación" });
-            combox_metodo_demod.Location = new Point(176, 381);
-            combox_metodo_demod.Name = "combox_metodo_demod";
-            combox_metodo_demod.Size = new Size(162, 28);
-            combox_metodo_demod.TabIndex = 13;
-            combox_metodo_demod.SelectedIndex = 0;
-            combox_metodo_demod.SelectedIndexChanged += combox_metodo_demod_SelectedIndexChanged;
+            label_mensajes_correctos_valor.AutoSize = true;
+            label_mensajes_correctos_valor.Font = new Font("Segoe UI", 12F, FontStyle.Bold);
+            label_mensajes_correctos_valor.Location = new Point(265, 69);
+            label_mensajes_correctos_valor.Name = "label_mensajes_correctos_valor";
+            label_mensajes_correctos_valor.Size = new Size(24, 28);
+            label_mensajes_correctos_valor.TabIndex = 3;
+            label_mensajes_correctos_valor.Text = "0";
             // 
             // Demodulador_DSC
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1924, 990);
-            Controls.Add(combox_metodo_demod);
-            Controls.Add(label_metodo_demod);
-            Controls.Add(num_filtro_rx);
-            Controls.Add(label_filtro_rx);
-            Controls.Add(group_contadores);
+            Controls.Add(contador_group);
             Controls.Add(enviar_btn);
             Controls.Add(detener);
             Controls.Add(dataGridView1);
@@ -371,9 +308,8 @@
             ((System.ComponentModel.ISupportInitialize)splitContainer1).EndInit();
             splitContainer1.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)dataGridView1).EndInit();
-            group_contadores.ResumeLayout(false);
-            group_contadores.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)num_filtro_rx).EndInit();
+            contador_group.ResumeLayout(false);
+            contador_group.PerformLayout();
             ResumeLayout(false);
             PerformLayout();
         }
@@ -398,15 +334,10 @@
         private DataGridViewButtonColumn see_msg;
         private DataGridViewButtonColumn rta_msg;
         private Button enviar_btn;
-        private GroupBox group_contadores;
-        private Label label_recibidos_totales;
-        private Label label_recibidos_totales_valor;
-        private Label label_demodulados_correctos;
-        private Label label_demodulados_correctos_valor;
-        private Label label_filtro_rx;
-        private NumericUpDown num_filtro_rx;
-        private Button button_reiniciar_contador;
-        private Label label_metodo_demod;
-        private ComboBox combox_metodo_demod;
+        private GroupBox contador_group;
+        private Label label_mensajes_total_titulo;
+        private Label label_mensajes_total_valor;
+        private Label label_mensajes_correctos_titulo;
+        private Label label_mensajes_correctos_valor;
     }
 }

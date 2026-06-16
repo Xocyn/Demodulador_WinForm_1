@@ -2,10 +2,19 @@ using NAudio.Wave;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Runtime.InteropServices;
 
-public class BFSKDemodulator
+public interface IDscDemodulator
 {
-    const int SampleRate = 44100;
+    int PhaseCount { get; }
+    string[] ProcessAudio(byte[] buffer, int bytesRecorded);
+    void ResetTiming();
+    void ResetAll();
+}
+
+public class BFSKDemodulator : IDscDemodulator
+{
+    const int SampleRate = 48000;
 
     private double _freqBit0;
     private double _freqBit1;
@@ -18,14 +27,14 @@ public class BFSKDemodulator
     //   · _writePos apunta al próximo slot de escritura (módulo BufSize).
     //   · _totalSamples es el contador absoluto de muestras escritas desde el inicio.
     //   · Los acumuladores guardan posición absoluta; se mapean a _buf con % BufSize.
-    private const int BufSize = 8192; // ~185ms a 44100Hz, potencia de 2
+    private const int BufSize = 8192; // ~171ms a 48000Hz, potencia de 2
     private readonly short[] _buf = new short[BufSize];
     private int _writePos = 0;
     private long _totalSamples = 0;
 
     // ── 4 fases en paralelo ───────────────────────────────────────────────────
-    private const int PhaseCount = 4;
-    private readonly double[] _accumulators = new double[PhaseCount];
+    private const int PhaseCountInternal = 4;
+    private readonly double[] _accumulators = new double[PhaseCountInternal];
     private int _activePhase = -1;
     private bool _phaseLocked = false;
 
@@ -78,6 +87,20 @@ public class BFSKDemodulator
     }
 
     // ── LockPhase: llamar cuando una fase detectó el dot pattern ─────────────
+    public void ResetAll()
+    {
+        _phaseLocked = false;
+        _activePhase = -1;
+        Array.Clear(_buf, 0, _buf.Length);
+        _writePos = 0;
+        _totalSamples = 0;
+
+        for (int p = 0; p < PhaseCountInternal; p++)
+            _accumulators[p] = p * (_samplesPerSymbol / PhaseCountInternal);
+    }
+
+    public int PhaseCount => PhaseCountInternal;
+
     public void LockPhase(int phaseIndex)
     {
         _activePhase = phaseIndex;
@@ -95,14 +118,19 @@ public class BFSKDemodulator
     //   4. Energía bruta, e0 y e1 en el mismo loop: 1 pasada en vez de 3.
     public string[] ProcessAudio(byte[] buffer, int bytesRecorded)
     {
-        // WaveBuffer expone el byte[] de NAudio como ShortBuffer sin ninguna copia.
-        var wb = new WaveBuffer(buffer);
-        int sampleCount = bytesRecorded / 2;
+        // WaveBuffer requiere que el array tenga longitud múltiplo de 4 para que
+        // los offsets de la union sean correctos. El buffer copiado en CapturaDatos
+        // tiene exactamente bytesRecorded bytes, que puede no ser múltiplo de 4.
+        // MemoryMarshal.Cast es la alternativa segura: reinterpreta el span de bytes
+        // como span de shorts sin ninguna copia y sin restricciones de alineación.
+        var samples = MemoryMarshal.Cast<byte, short>(
+            buffer.AsSpan(0, bytesRecorded));
+        int sampleCount = samples.Length;
 
         // Escribir muestras en el buffer circular
         for (int i = 0; i < sampleCount; i++)
         {
-            _buf[_writePos] = wb.ShortBuffer[i];
+            _buf[_writePos] = samples[i];
             _writePos = (_writePos + 1) % BufSize;
             _totalSamples++;
         }
@@ -112,7 +140,7 @@ public class BFSKDemodulator
             results[p] = new StringBuilder();
 
         int pStart = _phaseLocked ? _activePhase : 0;
-        int pEnd   = _phaseLocked ? _activePhase + 1 : PhaseCount;
+        int pEnd = _phaseLocked ? _activePhase + 1 : PhaseCountInternal;
 
         for (int p = pStart; p < pEnd; p++)
         {
@@ -120,8 +148,8 @@ public class BFSKDemodulator
             {
                 // startAbs y endAbs son índices absolutos de muestra
                 long startAbs = (long)Math.Round(_accumulators[p]);
-                long endAbs   = (long)Math.Round(_accumulators[p] + _samplesPerSymbol);
-                int  length   = (int)(endAbs - startAbs);
+                long endAbs = (long)Math.Round(_accumulators[p] + _samplesPerSymbol);
+                int length = (int)(endAbs - startAbs);
 
                 // Verificar que las muestras siguen en el buffer circular
                 if (_totalSamples - startAbs > BufSize) { _accumulators[p] += _samplesPerSymbol; continue; }
@@ -189,6 +217,148 @@ public class BFSKDemodulator
         return results.Select(sb => sb.ToString()).ToArray();
     }
 }
+
+public class CorrelationBFSKDemodulator : IDscDemodulator
+{
+    private const int SampleRate = 48000;
+    private const int PhaseCountInternal = 40;
+    private const int BufSize = 32768;
+
+    private readonly double _samplesPerSymbol;
+    private readonly double _energyThreshold;
+    private readonly short[] _buf = new short[BufSize];
+    private readonly double[] _accumulators = new double[PhaseCountInternal];
+    private readonly double[] _cos0;
+    private readonly double[] _sin0;
+    private readonly double[] _cos1;
+    private readonly double[] _sin1;
+    private int _writePos;
+    private long _totalSamples;
+
+    public CorrelationBFSKDemodulator(bool vhf = false)
+    {
+        double freqBit0;
+        double freqBit1;
+        int bitRate;
+
+        if (vhf)
+        {
+            bitRate = 1200;
+            freqBit0 = 2100.0;
+            freqBit1 = 1300.0;
+        }
+        else
+        {
+            bitRate = 100;
+            freqBit0 = 1785.0;
+            freqBit1 = 1615.0;
+        }
+
+        _samplesPerSymbol = (double)SampleRate / bitRate;
+        int maxSymbolSamples = (int)Math.Ceiling(_samplesPerSymbol) + 1;
+        _cos0 = new double[maxSymbolSamples];
+        _sin0 = new double[maxSymbolSamples];
+        _cos1 = new double[maxSymbolSamples];
+        _sin1 = new double[maxSymbolSamples];
+
+        for (int n = 0; n < maxSymbolSamples; n++)
+        {
+            double angle0 = 2.0 * Math.PI * freqBit0 * n / SampleRate;
+            double angle1 = 2.0 * Math.PI * freqBit1 * n / SampleRate;
+            _cos0[n] = Math.Cos(angle0);
+            _sin0[n] = Math.Sin(angle0);
+            _cos1[n] = Math.Cos(angle1);
+            _sin1[n] = Math.Sin(angle1);
+        }
+
+        double minRms = short.MaxValue * 0.1;
+        _energyThreshold = minRms * minRms * _samplesPerSymbol;
+        ResetAll();
+    }
+
+    public int PhaseCount => PhaseCountInternal;
+
+    public void ResetTiming()
+    {
+        for (int p = 0; p < PhaseCountInternal; p++)
+            _accumulators[p] = _totalSamples + p * (_samplesPerSymbol / PhaseCountInternal);
+    }
+
+    public void ResetAll()
+    {
+        Array.Clear(_buf, 0, _buf.Length);
+        _writePos = 0;
+        _totalSamples = 0;
+
+        for (int p = 0; p < PhaseCountInternal; p++)
+            _accumulators[p] = p * (_samplesPerSymbol / PhaseCountInternal);
+    }
+
+    public string[] ProcessAudio(byte[] buffer, int bytesRecorded)
+    {
+        var samples = MemoryMarshal.Cast<byte, short>(buffer.AsSpan(0, bytesRecorded));
+        for (int i = 0; i < samples.Length; i++)
+        {
+            _buf[_writePos] = samples[i];
+            _writePos = (_writePos + 1) % BufSize;
+            _totalSamples++;
+        }
+
+        var results = new StringBuilder[PhaseCountInternal];
+        for (int p = 0; p < PhaseCountInternal; p++)
+            results[p] = new StringBuilder();
+
+        for (int p = 0; p < PhaseCountInternal; p++)
+        {
+            while (_accumulators[p] + _samplesPerSymbol <= _totalSamples)
+            {
+                long startAbs = (long)Math.Round(_accumulators[p]);
+                long endAbs = (long)Math.Round(_accumulators[p] + _samplesPerSymbol);
+                int length = (int)(endAbs - startAbs);
+
+                if (_totalSamples - startAbs > BufSize)
+                {
+                    _accumulators[p] += _samplesPerSymbol;
+                    continue;
+                }
+
+                if (endAbs > _totalSamples || length <= 0)
+                    break;
+
+                double mean = 0.0;
+                for (int n = 0; n < length; n++)
+                    mean += _buf[(int)((startAbs + n) % BufSize)];
+                mean /= length;
+
+                double rawE = 0.0;
+                double i0 = 0.0, q0 = 0.0;
+                double i1 = 0.0, q1 = 0.0;
+
+                for (int n = 0; n < length; n++)
+                {
+                    double sample = _buf[(int)((startAbs + n) % BufSize)] - mean;
+                    rawE += sample * sample;
+                    i0 += sample * _cos0[n];
+                    q0 += sample * _sin0[n];
+                    i1 += sample * _cos1[n];
+                    q1 += sample * _sin1[n];
+                }
+
+                if (rawE >= _energyThreshold)
+                {
+                    double e0 = i0 * i0 + q0 * q0;
+                    double e1 = i1 * i1 + q1 * q1;
+                    results[p].Append(e1 > e0 ? '1' : '0');
+                }
+
+                _accumulators[p] += _samplesPerSymbol;
+            }
+        }
+
+        return results.Select(sb => sb.ToString()).ToArray();
+    }
+}
+
 public class BFSKModulator
 {
     public static void GenerateWav(string inputTxt, string outputWav, bool vhf)
@@ -210,11 +380,10 @@ public class BFSKModulator
             f1 = 1615.0;     // bit 1
         }
 
-        const int sampleRate = 44100;
+        const int sampleRate = 48000;
 
-        // samplesPerBit como double: 44100/1200 = 36.75 (NO se trunca a 36).
-        // Si se usara int, cada símbolo VHF perdería 0.75 muestras →
-        // drift de ~3 símbolos en un mensaje de 150 bits.
+        // A 48000 Hz, VHF 1200 bps queda exacto: 40 muestras por símbolo.
+        // HF 100 bps también queda exacto: 480 muestras por símbolo.
         double samplesPerBit = (double)sampleRate / bitRate;
 
         string bitstream = File.ReadAllText(inputTxt);

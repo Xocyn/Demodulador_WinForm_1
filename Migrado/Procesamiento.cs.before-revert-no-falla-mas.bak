@@ -81,6 +81,12 @@ namespace Dem_v2
         /// </summary>
         public bool Procesar(string input)
         {
+            return Procesar(input, out _);
+        }
+
+        public bool Procesar(string input, out string motivoRechazo)
+        {
+            motivoRechazo = string.Empty;
             try
             {
                 List<(int Index, int Value)> encontrados = new List<(int, int)>();
@@ -116,6 +122,13 @@ namespace Dem_v2
                 }
 
                 // ── Fase 2: Format specifier ─────────────────────────────────────────
+                if (!sincronizado)
+                {
+                    motivoRechazo = $"sin phasing valido, bits={input.Length}";
+                    LogToDisplay($"[Rechazo] {motivoRechazo}\n");
+                    return false;
+                }
+
                 bool formatConfirmed = false;
                 bool dxrxConfirmed = false;
                 int form = 0;
@@ -141,10 +154,29 @@ namespace Dem_v2
                     }
                 }
 
+                if (!formatConfirmed)
+                {
+                    motivoRechazo = $"sin format specifier valido, bits={input.Length}";
+                    LogToDisplay($"[Rechazo] {motivoRechazo}\n");
+                    return false;
+                }
+
                 i -= 10; // Retroceder para que el switch lea el format specifier
+                if (i < 0)
+                {
+                    motivoRechazo = $"indice de format specifier invalido, bits={input.Length}";
+                    LogToDisplay($"[Rechazo] {motivoRechazo}\n");
+                    return false;
+                }
 
                 // ── Fase 3: Extracción de Mensaje ──────────────────────────────────
                 Decodificador.Mensaje(input, i, out List<int> MESSAGE);
+                if (MESSAGE.Count == 0)
+                {
+                    motivoRechazo = $"mensaje vacio luego de decodificar, bits={input.Length}, inicio={i}";
+                    LogToDisplay($"[Rechazo] {motivoRechazo}\n");
+                    return false;
+                }
 
                 List<int> MENSAJE = MESSAGE.ToList();
                 List<int> ECC = MESSAGE.ToList();
@@ -195,6 +227,8 @@ namespace Dem_v2
                     else
                     {
                         LogToDisplay("✗ Error en ECC\n");
+                        motivoRechazo = $"ECC principal invalido, simbolos={MENSAJE.Count}, bits={input.Length}";
+                        LogToDisplay($"[Rechazo] {motivoRechazo}\n");
                         return false;
                     }
 
@@ -230,6 +264,8 @@ namespace Dem_v2
                     else
                     {
                         LogToDisplay("✗ Error en ECC\n");
+                        motivoRechazo = $"ECC principal invalido, simbolos={MENSAJE.Count}, bits={input.Length}";
+                        LogToDisplay($"[Rechazo] {motivoRechazo}\n");
                         return false;
                     }
                 }
@@ -266,16 +302,20 @@ namespace Dem_v2
 
                     case 123:
                         LogToDisplay("Formato 123 detectado (no implementado)\n");
+                        motivoRechazo = $"formato 123 no implementado, simbolos={MENSAJE.Count}, bits={input.Length}";
+                        LogToDisplay($"[Rechazo] {motivoRechazo}\n");
                         return false;
 
                     default:
                         LogToDisplay($"Formato desconocido: {MENSAJE[0]}\n");
+                        motivoRechazo = $"formato desconocido {MENSAJE[0]}, simbolos={MENSAJE.Count}, bits={input.Length}";
+                        LogToDisplay($"[Rechazo] {motivoRechazo}\n");
                         return false;
                 }
 
                 LogToDisplay("\n");
 
-                _form.AgregarFila(formatoMensaje, MSG.categoria, MSG.Fecha_recepcion.ToString("HH:mm:ss"), "CHECK", MSG.ack);
+                _form?.AgregarFila(formatoMensaje, MSG.categoria, MSG.Fecha_recepcion.ToString("HH:mm:ss"), "CHECK", MSG.ack);
                 MSG.extension = extension;
                 List<int> M_E_M = MENSAJE_EXT.ToList(); // sino duplicaba se rompia
                 MSG.Mensaje_ext = (extension && ecc_ext) ? M_E_M : null;
@@ -302,9 +342,9 @@ namespace Dem_v2
             catch (Exception ex)
             {
                 LogToDisplay($"❌ Error en Procesar: {ex.Message}\n");
+                motivoRechazo = $"excepcion en Procesar: {ex.Message}, bits={input.Length}";
+                return false;
             }
-
-            return false;
         }
 
         public bool VerificarECC(List<int> MESSAGE, List<int> ECC)

@@ -12,8 +12,8 @@ namespace Demodulador_WinForm_1
         private CapturaDatos _capturaDatos;
         private bool _isCapturing = false;
         private readonly Procesamiento _procesamiento;
-        private int _mensajesRecibidosTotales;
-        private int _mensajesDemoduladosCorrectos;
+        private int _mensajesRecibidosTotal;
+        private int _mensajesCorrectosTotal;
         public bool vhf => combox_hf_vhf.SelectedIndex == 1;
         public Demodulador_DSC()
         {
@@ -32,7 +32,6 @@ namespace Demodulador_WinForm_1
             dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
 
             _capturaDatos = new CapturaDatos(_procesamiento, this);
-            ActualizarContadoresMensajes();
 
             for (int i = 0; i < WaveInEvent.DeviceCount; i++)
             {
@@ -67,13 +66,9 @@ namespace Demodulador_WinForm_1
         {
             string dispositivo = combox_dispositivos.SelectedItem?.ToString() ?? "Desconocido";
             DISPLAYSECUNDARIO.AppendText($"Dispositivo seleccionado: {dispositivo}\n");
+            combox_dispositivos.Enabled = false;
 
-            if (_isCapturing)
-            {
-                DISPLAYSECUNDARIO.AppendText("Cambiando dispositivo de captura...\n");
-                _capturaDatos.CambiarDispositivo();
-            }
-            else if (combox_hf_vhf.SelectedIndex >= 0)
+            if (!_isCapturing && combox_hf_vhf.SelectedIndex >= 0)
             {
                 DISPLAYSECUNDARIO.AppendText("Iniciando captura de datos...\n");
                 _capturaDatos.IniciarCaptura();
@@ -99,70 +94,42 @@ namespace Demodulador_WinForm_1
         {
             if (dataGridView1.InvokeRequired)
             {
-                // Estamos en un thread diferente, usar Invoke para actualizar UI
                 this.Invoke(() => AgregarFila(formato, categoria, hora, ecc, rta));
             }
             else
             {
-                // Estamos en el thread de UI, actualizar directamente
                 dataGridView1.Rows.Insert(0, formato, categoria, hora, ecc, rta);
             }
         }
 
-        public void RegistrarMensajeRecibido(bool correcto)
+        public void RegistrarMensajeRecibido()
         {
             if (InvokeRequired)
             {
-                Invoke(() => RegistrarMensajeRecibido(correcto));
+                BeginInvoke((Action)RegistrarMensajeRecibido);
                 return;
             }
 
-            _mensajesRecibidosTotales++;
-            if (correcto)
-                _mensajesDemoduladosCorrectos++;
+            _mensajesRecibidosTotal++;
+            ActualizarContadoresMensajes();
+        }
 
+        public void RegistrarMensajeCorrecto()
+        {
+            if (InvokeRequired)
+            {
+                BeginInvoke((Action)RegistrarMensajeCorrecto);
+                return;
+            }
+
+            _mensajesCorrectosTotal++;
             ActualizarContadoresMensajes();
         }
 
         private void ActualizarContadoresMensajes()
         {
-            label_recibidos_totales_valor.Text = _mensajesRecibidosTotales.ToString();
-            label_demodulados_correctos_valor.Text = _mensajesDemoduladosCorrectos.ToString();
-        }
-
-        private void button_reiniciar_contador_Click(object sender, EventArgs e)
-        {
-            _mensajesRecibidosTotales = 0;
-            _mensajesDemoduladosCorrectos = 0;
-            ActualizarContadoresMensajes();
-        }
-
-        public double ObtenerFiltroPasabajosRxHz()
-        {
-            if (InvokeRequired)
-                return (double)Invoke(new Func<double>(ObtenerFiltroPasabajosRxHz));
-
-            return (double)num_filtro_rx.Value;
-        }
-
-        public bool UsarDemodulacionCorrelacion()
-        {
-            if (InvokeRequired)
-                return (bool)Invoke(new Func<bool>(UsarDemodulacionCorrelacion));
-
-            return combox_metodo_demod.SelectedIndex == 1;
-        }
-
-        private void combox_metodo_demod_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            string metodo = combox_metodo_demod.SelectedItem?.ToString() ?? "Actual";
-            DISPLAYSECUNDARIO.AppendText($"Método de demodulación seleccionado: {metodo}\n");
-
-            if (_isCapturing)
-            {
-                DISPLAYSECUNDARIO.AppendText("Cambiando método de demodulación...\n");
-                _capturaDatos.CambiarModo();
-            }
+            label_mensajes_total_valor.Text = _mensajesRecibidosTotal.ToString();
+            label_mensajes_correctos_valor.Text = _mensajesCorrectosTotal.ToString();
         }
 
         private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
