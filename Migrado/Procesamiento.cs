@@ -1364,6 +1364,8 @@ namespace Dem_v2
         public bool extension { get; set; } 
         public string categoria { get; set; } = string.Empty;
         public List<int> ? Mensaje_ext { get; set; } // Acepta NULLs
+        public string MMSI_RX { get; set; } = string.Empty;
+        public int formato_rtx { get; set; }
     }
    
 }

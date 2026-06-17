@@ -20,24 +20,24 @@ namespace Dem_v2
                 case 112:
                     if (rtx)
                     {
-                        RetransmisionSocorro(msg.data_respuesta);    
+                        RetransmisionSocorro(msg);    
                     }
                     else
                     {
-                        RespuestaSocorro(msg.data_respuesta);
+                        RespuestaSocorro(msg);
                     }
                     break;
                 default:
                     break;
             }
         }
-        static public void RespuestaSocorro(List<int> datos_respuesta)
+        static public void RespuestaSocorro(Mensaje msg)
         {
             rta.Clear();
             ecc.Clear();
 
             // ⚠️ IMPORTANTE: Crear una copia para evitar modificar la lista original
-            List<int> datos_local = new List<int>(datos_respuesta);
+            List<int> datos_local = new List<int>(msg.data_respuesta);
             Geografica.EliminarPosicionesImpares(datos_local);
 
             Convertir.ConvertirNumero(116, rta); Convertir.ConvertirNumero(116, rta); ecc.Add(116);
@@ -55,24 +55,42 @@ namespace Dem_v2
 
         }
 
-        static public void RetransmisionSocorro(List<int> datos_respuesta)
+        static public void RetransmisionSocorro(Mensaje msg)
         {
             rta.Clear();
             ecc.Clear();
             // ⚠️ IMPORTANTE: Crear una copia para evitar modificar la lista original
-            List<int> datos_local = new List<int>(datos_respuesta);
+            List<int> datos_local = new List<int>(msg.data_respuesta);
             Geografica.EliminarPosicionesImpares(datos_local);
-            Convertir.ConvertirNumero(116, rta); Convertir.ConvertirNumero(116, rta); ecc.Add(116);
-            Convertir.ConvertirNumero(112, rta); ecc.Add(112);
-            Convertir.MMSI(rta, ecc, MMSI);
-            Convertir.ConvertirNumero(112, rta); ecc.Add(112);
-            for (int i = 0; i < datos_local.Count; i++)
+            if (msg.formato_rtx == 116)
             {
-                Convertir.ConvertirNumero(datos_local[i], rta); ecc.Add(datos_local[i]);
+                Convertir.ConvertirNumero(116, rta); Convertir.ConvertirNumero(116, rta); ecc.Add(116);
+                Convertir.ConvertirNumero(112, rta); ecc.Add(112);
+                Convertir.MMSI(rta, ecc, MMSI);
+                Convertir.ConvertirNumero(112, rta); ecc.Add(112);
+                for (int i = 0; i < datos_local.Count; i++)
+                {
+                    Convertir.ConvertirNumero(datos_local[i], rta); ecc.Add(datos_local[i]);
+                }
+                Convertir.ConvertirNumero(127, rta); ecc.Add(127);
+                Convertir.ConvertirNumero(Convertir.Mod2Sum7Bits(ecc), rta);
+                Convertir.ConvertirNumero(127, rta); Convertir.ConvertirNumero(127, rta);
             }
-            Convertir.ConvertirNumero(127, rta); ecc.Add(127);
-            Convertir.ConvertirNumero(Convertir.Mod2Sum7Bits(ecc), rta);
-            Convertir.ConvertirNumero(127, rta); Convertir.ConvertirNumero(127, rta);
+            else if (msg.formato_rtx == 120)
+            {
+                Convertir.ConvertirNumero(120, rta); Convertir.ConvertirNumero(120, rta); ecc.Add(120);
+                Convertir.MMSI(rta, ecc, msg.MMSI_RX);
+                Convertir.ConvertirNumero(112, rta); ecc.Add(112);
+                Convertir.MMSI(rta, ecc, MMSI);
+                Convertir.ConvertirNumero(112, rta); ecc.Add(112);
+                for (int i = 0; i < datos_local.Count; i++)
+                {
+                    Convertir.ConvertirNumero(datos_local[i], rta); ecc.Add(datos_local[i]);
+                }
+                Convertir.ConvertirNumero(117, rta); ecc.Add(117);
+                Convertir.ConvertirNumero(Convertir.Mod2Sum7Bits(ecc), rta);
+                Convertir.ConvertirNumero(117, rta); Convertir.ConvertirNumero(117  , rta);
+            }
             EOS();
         }
         static public void MensajeIndividual(string mmsi_rx, int categoria, int tipo_msg_ind, bool acuse, int canal, int motivo)

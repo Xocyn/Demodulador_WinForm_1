@@ -32,8 +32,10 @@
             btn_ack = new Button();
             btn_rtx = new Button();
             box_rtx = new GroupBox();
-            btn_all = new RadioButton();
             btn_ind = new RadioButton();
+            btn_all = new RadioButton();
+            text_mmsi_rx = new TextBox();
+            label_mssirx = new Label();
             box_rtx.SuspendLayout();
             SuspendLayout();
             // 
@@ -60,6 +62,7 @@
             // btn_rtx
             // 
             btn_rtx.BackColor = Color.Silver;
+            btn_rtx.Enabled = false;
             btn_rtx.Location = new Point(215, 136);
             btn_rtx.Name = "btn_rtx";
             btn_rtx.Size = new Size(106, 57);
@@ -79,17 +82,6 @@
             box_rtx.TabStop = false;
             box_rtx.Text = "Retransmitir";
             // 
-            // btn_all
-            // 
-            btn_all.AutoSize = true;
-            btn_all.Location = new Point(8, 31);
-            btn_all.Name = "btn_all";
-            btn_all.Size = new Size(97, 24);
-            btn_all.TabIndex = 0;
-            btn_all.TabStop = true;
-            btn_all.Text = "ALL SHIPS";
-            btn_all.UseVisualStyleBackColor = true;
-            // 
             // btn_ind
             // 
             btn_ind.AutoSize = true;
@@ -100,12 +92,47 @@
             btn_ind.TabStop = true;
             btn_ind.Text = "INDIVIDUAL";
             btn_ind.UseVisualStyleBackColor = true;
+            btn_ind.CheckedChanged += btn_ind_CheckedChanged;
+            // 
+            // btn_all
+            // 
+            btn_all.AutoSize = true;
+            btn_all.Location = new Point(8, 31);
+            btn_all.Name = "btn_all";
+            btn_all.Size = new Size(97, 24);
+            btn_all.TabIndex = 0;
+            btn_all.TabStop = true;
+            btn_all.Text = "ALL SHIPS";
+            btn_all.UseVisualStyleBackColor = true;
+            btn_all.CheckedChanged += btn_all_CheckedChanged;
+            // 
+            // text_mmsi_rx
+            // 
+            text_mmsi_rx.Location = new Point(132, 234);
+            text_mmsi_rx.Name = "text_mmsi_rx";
+            text_mmsi_rx.Size = new Size(159, 27);
+            text_mmsi_rx.TabIndex = 4;
+            text_mmsi_rx.Visible = false;
+            text_mmsi_rx.TextChanged += text_mmsi_rx_TextChanged;
+            text_mmsi_rx.KeyPress += text_mmsi_rx_KeyPress;
+            // 
+            // label_mssirx
+            // 
+            label_mssirx.AutoSize = true;
+            label_mssirx.Location = new Point(65, 237);
+            label_mssirx.Name = "label_mssirx";
+            label_mssirx.Size = new Size(67, 20);
+            label_mssirx.TabIndex = 5;
+            label_mssirx.Text = "MSSI RX:";
+            label_mssirx.Visible = false;
             // 
             // ack_rtx
             // 
             AutoScaleDimensions = new SizeF(8F, 20F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(387, 325);
+            Controls.Add(label_mssirx);
+            Controls.Add(text_mmsi_rx);
             Controls.Add(box_rtx);
             Controls.Add(btn_rtx);
             Controls.Add(btn_ack);
@@ -126,5 +153,7 @@
         private GroupBox box_rtx;
         private RadioButton btn_ind;
         private RadioButton btn_all;
+        private TextBox text_mmsi_rx;
+        private Label label_mssirx;
     }
 }
