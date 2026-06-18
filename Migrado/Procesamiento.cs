@@ -504,6 +504,7 @@ namespace Dem_v2
                 Formato = 102,
                 ack = ack,
                 categoria = categoria,
+                primer_telemando = mensaje[26],
             };
             return GEO;
         }
@@ -602,7 +603,7 @@ namespace Dem_v2
             }
             else
             {
-                _log($"Segundo Telemando: {segundo_tel}\n"); _logger.RegistrarCampo("Segundo Telemando", segundo_tel);  
+                _log($"Segundo Telemando: {segundo_tel}\n"); _logger.RegistrarCampo("Segundo Telemando", segundo_tel);
                 if (posicion.Count > 0)
                 {
                     if (posicion[posicion.Count - 1] == 117)
@@ -642,15 +643,33 @@ namespace Dem_v2
                 }
                 _log($"{ack}\n"); _logger.RegistrarCampo("ACK", ack);
             }
-            Mensaje IND= new Mensaje()
+            if (mensaje[26] == 112)
             {
-                Mensaje_List = mensaje,
-                Fecha_recepcion = DateTime.Now,
-                Formato = 120,
-                ack = ack,
-                categoria = categoria,
-            };
-            return IND;
+                Mensaje IND = new Mensaje()
+                {
+                    Mensaje_List = mensaje,
+                    Fecha_recepcion = DateTime.Now,
+                    Formato = 120,
+                    ack = ack,
+                    categoria = categoria,
+                    primer_telemando = mensaje[26],
+                    data_respuesta = mensaje.GetRange(28, 28),
+                    MMSI_RX = mmsi_transmisor,
+                };
+                return IND;
+            }
+            else
+            {
+                Mensaje IND = new Mensaje()
+                {
+                    Mensaje_List = mensaje,
+                    Fecha_recepcion = DateTime.Now,
+                    Formato = 120,
+                    ack = ack,
+                    categoria = categoria,
+                };
+                return IND;
+            } 
         }
 
         // ── SOCORRO ─────────────────────────────────────────────────────
@@ -796,16 +815,33 @@ namespace Dem_v2
 
                 _log($"{ack}\n"); _logger.RegistrarCampo("ACK", ack);
             }
-
-            Mensaje GRUP = new Mensaje
+            if (mensaje[14] == 112)
             {
-                Mensaje_List = mensaje,
-                Fecha_recepcion = DateTime.Now,
-                Formato = 114,
-                ack = ack,
-                categoria = categoria,
-            };
-            return GRUP;
+                Mensaje GRUP = new Mensaje
+                {
+                    Mensaje_List = mensaje,
+                    Fecha_recepcion = DateTime.Now,
+                    Formato = 114,
+                    ack = ack,
+                    categoria = categoria,
+                    primer_telemando = mensaje[26],
+                    data_respuesta = mensaje.GetRange(28, 28),
+                    MMSI_RX = mmsi_tx,
+                };
+                return GRUP;
+            }
+            else
+            {
+                Mensaje GRUP = new Mensaje
+                {
+                    Mensaje_List = mensaje,
+                    Fecha_recepcion = DateTime.Now,
+                    Formato = 114,
+                    ack = ack,
+                    categoria = categoria,
+                };
+                return GRUP;
+            }
         }
 
         // ── ALL SHIPS─────────────────────────────────────────────────────
@@ -900,15 +936,33 @@ namespace Dem_v2
                  _log($"{ack}\n"); _logger.RegistrarCampo("ACK", ack);
             }
 
-            Mensaje ALL = new Mensaje
+            if (mensaje[16] == 112)
             {
-                Mensaje_List = mensaje,
-                Fecha_recepcion = DateTime.Now,
-                Formato = 116,
-                ack = ack,
-                categoria = categoria,
-            };
-            return ALL;
+
+                Mensaje ALL = new Mensaje
+                {
+                    Mensaje_List = mensaje,
+                    Fecha_recepcion = DateTime.Now,
+                    Formato = 116,
+                    ack = ack,
+                    categoria = categoria,
+                    primer_telemando = mensaje[16],
+                    data_respuesta = mensaje.GetRange(18, 28)
+                };
+                return ALL;
+            }
+            else
+            {
+                Mensaje ALL = new Mensaje
+                {
+                    Mensaje_List = mensaje,
+                    Fecha_recepcion = DateTime.Now,
+                    Formato = 116,
+                    ack = ack,
+                    categoria = categoria
+                };
+                return ALL;
+            }
         }
     }
 
@@ -1366,6 +1420,7 @@ namespace Dem_v2
         public List<int> ? Mensaje_ext { get; set; } // Acepta NULLs
         public string MMSI_RX { get; set; } = string.Empty;
         public int formato_rtx { get; set; }
+        public int primer_telemando { get; set; }
     }
    
 }

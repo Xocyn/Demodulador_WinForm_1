@@ -197,6 +197,10 @@ namespace Demodulador_WinForm_1
                 var ventana_ack_rtx = new ack_rtx(msg);
                 ventana_ack_rtx.Show();
             }
+            else if (dataGridView1.Columns[e.ColumnIndex].Name == "rta_msg" && msg.primer_telemando == 112) //rtx socorro
+            { 
+                Respuesta.ACKRTX(msg);
+            }
         }
 
         private void detener_Click(object sender, EventArgs e)
