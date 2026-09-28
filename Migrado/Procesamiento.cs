@@ -54,27 +54,6 @@ namespace Dem_v2
         {
             _logger.Log(message);
         }
-
-        private void ClearDisplay()
-        {
-            _logger.LimpiarDisplay();
-        }
-
-        /// <summary>
-        /// Muestra un menú de confirmación para responder a un mensaje de socorro
-        /// </summary>
-        private bool MostrarMenuSocorro()
-        {
-            // En WinForms, usamos MessageBox en lugar de Console
-            DialogResult result = MessageBox.Show(
-                "¿Desea responder el mensaje de S.O.S?",
-                "ALERTA DE SOCORRO",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Warning);
-
-            return result == DialogResult.Yes;
-        }
-
         /// <summary>
         /// Procesa una cadena de bits decodificada en un mensaje DSC.
         /// Este es el método principal que ejecuta toda la lógica de decodificación.
@@ -116,32 +95,32 @@ namespace Dem_v2
                 }
 
                 // ── Fase 2: Format specifier ─────────────────────────────────────────
-                //bool formatConfirmed = false;
-                //bool dxrxConfirmed = false;
-                //int form = 0;
+                bool formatConfirmed = false;
+                bool dxrxConfirmed = false;
+                int form = 0;
 
-                //while (sincronizado && !formatConfirmed)
-                //{
-                //    if (i + 10 > input.Length) break;
+                while (sincronizado && !formatConfirmed)
+                {
+                    if (i + 10 > input.Length) break;
 
-                //    string ventana = input.Substring(i, 10);
-                //    int mensajeInt = Convert.ToInt32(ventana, 2);
-                //    Decodificador.TryDecodificarMensaje(mensajeInt, out int valor);
+                    string ventana = input.Substring(i, 10);
+                    int mensajeInt = Convert.ToInt32(ventana, 2);
+                    Decodificador.TryDecodificarMensaje(mensajeInt, out int valor);
 
-                //    form = FormatSpecifier.Filtro2(valor, out int j);
+                    form = FormatSpecifier.Filtro2(valor, out int j);
 
-                //    bool esBroadcast = (form == 112 || form == 116);
-                //    dxrxConfirmed = esBroadcast || Decodificador.DxRx(input, i);
+                    bool esBroadcast = (form == 112 || form == 116);
+                    dxrxConfirmed = esBroadcast || Decodificador.DxRx(input, i);
 
-                //    i += 10;
+                    i += 10;
 
-                //    if (j == 1 && dxrxConfirmed)
-                //    {
-                //        formatConfirmed = true;
-                //    }
-                //}
+                    if (j == 1 && dxrxConfirmed)
+                    {
+                        formatConfirmed = true;
+                    }
+                }
 
-                //i -= 10; // Retroceder para que el switch lea el format specifier
+                i -= 10; // Retroceder para que el switch lea el format specifier
 
                 // ── Fase 3: Extracción de Mensaje ──────────────────────────────────
                 Decodificador.Mensaje(input, i, out List<int> MESSAGE);

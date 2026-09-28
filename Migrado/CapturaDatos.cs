@@ -430,7 +430,7 @@ namespace Demodulador_WinForm_1
                 int caracteresMostrados = 0;
                 long siguienteDisplayCaracteresTicks = 0;
                 Estado estado = Estado.EsperandoInicio;
-                double duracionGrabacionMs = vhfMode ? 2000.0 : 10000.0;
+                double duracionGrabacionMs = vhfMode ? 2200.0 : 10000.0; //SI TIENE EXTENSION NO FUNCIONA
                 double tiempoRearmeMs = vhfMode ? 700.0 : 1200.0;
                 long inicioGrabacionTicks = 0;
                 long inicioRearmeTicks = 0;
@@ -596,7 +596,11 @@ namespace Demodulador_WinForm_1
                                             if (TryDecodeDscCharacter(bitsPendientes, 0, out int valor))
                                                 caracteresCapturados.Add(valor);
                                             else
+                                            {
+                                                // Mantener la posición para comparar con el RX situado cinco símbolos después.
+                                                caracteresCapturados.Add(-1);
                                                 caracteresInvalidos++;
+                                            }
                                             bitsPendientes.Clear();
                                         }
                                     }
@@ -681,8 +685,8 @@ namespace Demodulador_WinForm_1
                                 LogToDisplay($"[FinalizarCaptura - {motivo}] fase={lockedPhase}, {capturado.Count} caracteres decodificados, {caracteresInvalidos} invalidos.\n");
                                 if (capturado.Count > 0)
                                 {
-                                    _procesamiento2.Procesar(capturado);
-                                    RegistrarCaptura(false);
+                                    bool correcto = _procesamiento2.Procesar(capturado);
+                                    RegistrarCaptura(correcto);
                                 }
                                 else
                                 {

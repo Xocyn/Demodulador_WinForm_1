@@ -7,6 +7,8 @@ namespace Dem_v2
 {
     internal static class FormatSpecifier
     {
+        public const string ValorNoReconocido = "Valor no reconocido";
+
         public static string Formato(int valor)
         {
             return valor switch
@@ -17,7 +19,7 @@ namespace Dem_v2
                 120 => "Llamada Individual (120)",
                 102 => "Llamada a Area Geografica (102)",
                 123 => "Automática (123)",
-                _ => "Valor no reconocido" // Caso por defecto
+                _ => ValorNoReconocido // Caso por defecto
             };
         }
 
