@@ -1,5 +1,6 @@
 ﻿using Dem_v2;
 using NAudio.Wave;
+using Demodulador_WinForm_1.Migrado;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -18,6 +19,7 @@ namespace Demodulador_WinForm_1
         private const int CaptureSampleRate = 48000;
         private const int RealtimeDisplaySamples = 256;
         private const int RealtimeDisplayIntervalMs = 200;
+        private const int PhasingPatternBits = 30;
         private const int NoiseCalibrationMilliseconds = 2000;
         private const double NoiseGateOpenMarginDb = 10.0;
         private const double NoiseGateCloseMarginDb = 6.0;
@@ -33,10 +35,6 @@ namespace Demodulador_WinForm_1
 
         private readonly Demodulador_DSC _form;
 
-        // Cola de mensajes DSC demodulados — el thread de demodulación deposita aquí,
-        // el thread de procesamiento consume.
-        private readonly ConcurrentQueue<string> _mensajesCapturados = new();
-
         // Cola de bloques de audio crudos — DataAvailable deposita aquí (copia mínima),
         // el thread de demodulación consume. BlockingCollection permite Wait() sin spinning.
         private BlockingCollection<(long sequence, byte[] buffer, int bytesRecorded, long captureTicks)> _audioQueue;
@@ -45,7 +43,7 @@ namespace Demodulador_WinForm_1
         // ⚠️ NOTA: Se crea de nuevo cada vez que se inicia captura, NO es readonly
         private CancellationTokenSource _cts;
 
-        private Thread _demodThread;  // consume _audioQueue, produce _mensajesCapturados
+        private Thread _demodThread;  // consume _audioQueue y decodifica caracteres DSC
 
         // Lock para proteger las variables de estado compartidas entre el thread de audio
         // y el thread principal (cambio de modo con M).
@@ -53,9 +51,8 @@ namespace Demodulador_WinForm_1
 
         private WaveInEvent _waveIn;
         private IDscDemodulator _demod;
-        private Thread _processingThread;
         private bool _isRunning = false;
-        private readonly Procesamiento _procesamiento;  // ← agregar campo
+        private readonly Procesamiento2 _procesamiento2;
 
         private bool pausa = false;
 
@@ -155,10 +152,11 @@ namespace Demodulador_WinForm_1
             }
         }
 
-        public CapturaDatos(Procesamiento procesamiento, Demodulador_DSC form = null)  // ← agregar parámetro
+        // Se conserva el parámetro Procesamiento para las ventanas que aún usan el constructor anterior.
+        public CapturaDatos(Procesamiento procesamiento, Demodulador_DSC form = null)
         {
             _form = form;
-            _procesamiento = procesamiento;  // ← guardar referencia
+            _procesamiento2 = new Procesamiento2(form?.MAINDISPLAY);
         }
         private void LogToDisplay(string message)
         {
@@ -188,16 +186,19 @@ namespace Demodulador_WinForm_1
             }
         }
 
-        private void ClearMAIN()
+        private void RegistrarCaptura(bool correcta)
         {
-            if (_form?.InvokeRequired == true)
+            if (_form == null || _form.IsDisposed || !_form.IsHandleCreated)
+                return;
+
+            try
             {
-                _form.Invoke(() => _form.MAINDISPLAY.Clear());
+                if (_form.InvokeRequired)
+                    _form.BeginInvoke(() => _form.RegistrarMensajeRecibido(correcta));
+                else
+                    _form.RegistrarMensajeRecibido(correcta);
             }
-            else
-            {
-                _form?.MAINDISPLAY.Clear();
-            }
+            catch (InvalidOperationException) { }
         }
 
         private static double TicksToMilliseconds(long ticks)
@@ -240,270 +241,44 @@ namespace Demodulador_WinForm_1
             Interlocked.Exchange(ref _audioCallbackMaxGapTicks, 0);
         }
 
-        private static bool TryLooksLikeValidDsc(string input, out string detail)
+        private static bool TryDetectPhasingPattern(
+            StringBuilder bits,
+            List<(int Index, int Value)> characters,
+            out PhasingPattern pattern)
         {
-            detail = string.Empty;
-            if (string.IsNullOrEmpty(input) || input.Length < 80)
-            {
-                detail = $"bits insuficientes ({input?.Length ?? 0})";
+            pattern = PhasingPattern.None;
+            if (bits.Length < PhasingPatternBits)
                 return false;
+
+            characters.Clear();
+            for (int offset = 0; offset < PhasingPatternBits; offset += 10)
+            {
+                if (!TryDecodeDscCharacter(bits, offset, out int value) ||
+                    !PhasingSequence.TryCaracter(value))
+                    return false;
+
+                characters.Add((offset, value));
             }
 
-            List<(int Index, int Value)> encontrados = new();
-            int i = 0;
-            bool sincronizado = false;
+            return PhasingSequence.TryDetect(characters, out pattern);
+        }
 
-            while (!sincronizado)
+        private static bool TryDecodeDscCharacter(StringBuilder bits, int start, out int value)
+        {
+            int encoded = 0;
+            for (int i = 0; i < 10; i++)
             {
-                if (i + 10 > input.Length) break;
-
-                string ventana = input.Substring(i, 10);
-                int mensajeInt = Convert.ToInt32(ventana, 2);
-
-                if (Decodificador.TryDecodificarMensaje(mensajeInt, out int valor))
+                char bit = bits[start + i];
+                if (bit != '0' && bit != '1')
                 {
-                    if (PhasingSequence.TryCaracter(valor))
-                    {
-                        encontrados.Add((i, valor));
-                        i += 10;
-
-                        if (encontrados.Count >= 3 &&
-                            PhasingSequence.TryDetect(encontrados, out _))
-                        {
-                            sincronizado = true;
-                        }
-                    }
-                    else
-                    {
-                        i += 1;
-                    }
-                }
-                else
-                {
-                    i += 1;
-                }
-            }
-
-            if (!sincronizado)
-            {
-                detail = "sin phasing valido";
-                return false;
-            }
-
-            bool formatConfirmed = false;
-            int form = 0;
-
-            while (!formatConfirmed)
-            {
-                if (i + 10 > input.Length) break;
-
-                string ventana = input.Substring(i, 10);
-                int mensajeInt = Convert.ToInt32(ventana, 2);
-                Decodificador.TryDecodificarMensaje(mensajeInt, out int valor);
-
-                form = FormatSpecifier.Filtro2(valor, out int j);
-                bool esBroadcast = form == 112 || form == 116;
-                bool dxrxConfirmed = esBroadcast || Decodificador.DxRx(input, i);
-
-                i += 10;
-
-                if (j == 1 && dxrxConfirmed)
-                    formatConfirmed = true;
-            }
-
-            if (!formatConfirmed)
-            {
-                detail = "sin format specifier valido";
-                return false;
-            }
-
-            i -= 10;
-            if (i < 0 || i + 10 > input.Length)
-            {
-                detail = "indice de format specifier invalido";
-                return false;
-            }
-
-            DecodeDscMessageStrict(input, i, out List<int> message, out List<int> invalidSymbolIndexes);
-            if (message.Count < 6)
-            {
-                detail = $"mensaje demasiado corto ({message.Count} simbolos)";
-                return false;
-            }
-
-            if (!IsSupportedFormat(message[0]))
-            {
-                detail = $"formato no soportado ({message[0]})";
-                return false;
-            }
-
-            List<int> mainMessage = message;
-            if (Procesamiento.Extension(message))
-            {
-                int first127 = message.IndexOf(127);
-                int first122 = message.IndexOf(122);
-                int first117 = message.IndexOf(117);
-                int firstEos = new[] { first127, first122, first117 }
-                    .Where(x => x >= 0)
-                    .DefaultIfEmpty(-1)
-                    .Min();
-
-                if (firstEos < 0 || firstEos + 8 > message.Count)
-                {
-                    detail = "extension incompleta";
+                    value = 0;
                     return false;
                 }
 
-                mainMessage = message.GetRange(0, firstEos + 8);
+                encoded = (encoded << 1) | (bit - '0');
             }
 
-            if (invalidSymbolIndexes.Any(index => index < mainMessage.Count))
-            {
-                detail = $"simbolos invalidos antes de ECC ({invalidSymbolIndexes.Count})";
-                return false;
-            }
-
-            List<int> ecc = PrepareEcc(mainMessage);
-            if (!VerifyEcc(mainMessage, ecc))
-            {
-                detail = $"ECC invalido ({mainMessage.Count} simbolos)";
-                return false;
-            }
-
-            detail = $"formato={mainMessage[0]}, simbolos={mainMessage.Count}";
-            return true;
-        }
-
-        private static string SelectBestDscCandidate(string[] candidates, int preferredPhase, out int selectedPhase, out string detail)
-        {
-            selectedPhase = -1;
-            detail = "sin candidato valido";
-            var filteredCandidates = new string[candidates.Length];
-            var filterDetails = new string[candidates.Length];
-
-            for (int phase = 0; phase < candidates.Length; phase++)
-            {
-                filteredCandidates[phase] =
-                    DscFrameTrimmer.TrimAfterFinalEos(candidates[phase], out filterDetails[phase]);
-            }
-
-            if (preferredPhase >= 0 && preferredPhase < filteredCandidates.Length &&
-                TryLooksLikeValidDsc(filteredCandidates[preferredPhase], out string preferredDetail))
-            {
-                selectedPhase = preferredPhase;
-                detail = $"fase preferida valida: {preferredDetail}; {filterDetails[preferredPhase]}";
-                return filteredCandidates[preferredPhase];
-            }
-
-            int bestLength = -1;
-            string bestBits = string.Empty;
-            int fallbackPhase = -1;
-            int fallbackLength = -1;
-            string fallbackBits = string.Empty;
-            string fallbackDetail = string.Empty;
-
-            for (int phase = 0; phase < filteredCandidates.Length; phase++)
-            {
-                string bits = filteredCandidates[phase] ?? string.Empty;
-                if (bits.Length > fallbackLength)
-                {
-                    fallbackPhase = phase;
-                    fallbackLength = bits.Length;
-                    fallbackBits = bits;
-                    TryLooksLikeValidDsc(bits, out fallbackDetail);
-                }
-
-                if (TryLooksLikeValidDsc(bits, out string candidateDetail) && bits.Length > bestLength)
-                {
-                    selectedPhase = phase;
-                    bestLength = bits.Length;
-                    bestBits = bits;
-                    detail = $"fase alternativa valida: {candidateDetail}; {filterDetails[phase]}";
-                }
-            }
-
-            if (selectedPhase >= 0)
-                return bestBits;
-
-            if (preferredPhase >= 0 && preferredPhase < filteredCandidates.Length &&
-                !string.IsNullOrEmpty(filteredCandidates[preferredPhase]))
-            {
-                selectedPhase = preferredPhase;
-                TryLooksLikeValidDsc(filteredCandidates[preferredPhase], out string preferredFailure);
-                detail =
-                    $"fallback fase preferida sin ECC/estructura valida: {preferredFailure}; " +
-                    filterDetails[preferredPhase];
-                return filteredCandidates[preferredPhase];
-            }
-
-            selectedPhase = fallbackPhase;
-            detail =
-                $"fallback fase mas larga sin ECC/estructura valida: {fallbackDetail}; " +
-                (fallbackPhase >= 0 ? filterDetails[fallbackPhase] : "sin fase");
-            return fallbackBits;
-        }
-
-        private static bool IsSupportedFormat(int format)
-        {
-            return format == 102 || format == 112 || format == 114 || format == 116 || format == 120;
-        }
-
-        private static List<int> PrepareEcc(List<int> message)
-        {
-            if (message.Count < 4)
-                return new List<int>();
-
-            return message
-                .Skip(1)
-                .Take(message.Count - 4)
-                .ToList();
-        }
-
-        private static bool VerifyEcc(List<int> message, List<int> ecc)
-        {
-            if (message.Count < 6)
-                return false;
-
-            int eccDx = message[message.Count - 6];
-            int eccRx = message[message.Count - 1];
-            int calculated = 0;
-
-            foreach (int value in ecc)
-                calculated ^= value;
-
-            calculated &= 0x7F;
-            return calculated == eccDx || calculated == eccRx;
-        }
-
-        private static void DecodeDscMessageStrict(string input, int startIndex, out List<int> message, out List<int> invalidSymbolIndexes)
-        {
-            message = new List<int>();
-            invalidSymbolIndexes = new List<int>();
-            int symbolIndex = 0;
-
-            for (int k = startIndex; k + 10 <= input.Length; k += 10)
-            {
-                string ventana = input.Substring(k, 10);
-                if (Decodificador.TryDeco(ventana, out int value))
-                {
-                    message.Add(value);
-                    symbolIndex++;
-                    continue;
-                }
-
-                int rxIndex = k + 50;
-                if (rxIndex + 10 <= input.Length &&
-                    Decodificador.TryDeco(input.Substring(rxIndex, 10), out int rxValue))
-                {
-                    message.Add(rxValue);
-                    symbolIndex++;
-                    continue;
-                }
-
-                message.Add(0);
-                invalidSymbolIndexes.Add(symbolIndex);
-                symbolIndex++;
-            }
+            return Decodificador.TryDecodificarMensaje(encoded, out value);
         }
 
         // ── Detector de silencio ─────────────────────────────────────────────────
@@ -633,10 +408,6 @@ namespace Demodulador_WinForm_1
                 $"[Rendimiento] Visualización de onda limitada a " +
                 $"{RealtimeDisplaySamples} muestras cada {RealtimeDisplayIntervalMs} ms.\n");
 
-            // Instanciar Procesamiento con referencias a los controles del formulario
-            //var procesamiento = new Procesamiento(_form.MAINDISPLAY, _form);
-
-
             // ── Thread de demodulación ───────────────────────────────────────────────
             // Consume bloques de audio crudos de _audioQueue y ejecuta toda la lógica
             // de demodulación, detección de patrones y silencio.
@@ -646,17 +417,18 @@ namespace Demodulador_WinForm_1
             {
                 Thread.CurrentThread.Priority = ThreadPriority.Highest;
 
-                // Estado local del thread — mismo código que estaba en DataAvailable,
-                // sin ningún cambio de lógica.
+                // Estado de sincronización y decodificación de la recepción actual.
                 int PhaseCount = _demod.PhaseCount;
                 var syncBuffers = new StringBuilder[PhaseCount];
                 for (int p = 0; p < PhaseCount; p++) syncBuffers[p] = new StringBuilder();
 
                 int lockedPhase = -1;
-                int triggerPhase = -1;
-                var bitAccumulators = new StringBuilder[PhaseCount];
-                for (int p = 0; p < PhaseCount; p++) bitAccumulators[p] = new StringBuilder();
-                const string startPattern = "01010101010101010101";
+                var phasingCharacters = new List<(int Index, int Value)>(3);
+                var caracteresCapturados = new List<int>();
+                var bitsPendientes = new StringBuilder(10);
+                int caracteresInvalidos = 0;
+                int caracteresMostrados = 0;
+                long siguienteDisplayCaracteresTicks = 0;
                 Estado estado = Estado.EsperandoInicio;
                 double duracionGrabacionMs = vhfMode ? 2000.0 : 10000.0;
                 double tiempoRearmeMs = vhfMode ? 700.0 : 1200.0;
@@ -696,6 +468,9 @@ namespace Demodulador_WinForm_1
                                 {
                                     sequenceGaps += missing;
                                     LogToDisplay($"[AudioDiag] Gap de secuencia: esperado={expectedSequence}, recibido={sequence}, faltan={missing} bloque(s)\n");
+                                    // Una pérdida de audio invalida los límites de los caracteres.
+                                    LimpiarEstadoEntreRecepciones(descartarPendientes: false, resetearSecuencia: false);
+                                    estado = Estado.EsperandoInicio;
                                 }
 
                                 expectedSequence = sequence + 1;
@@ -780,12 +555,13 @@ namespace Demodulador_WinForm_1
 
                             bitsByPhase = _demod.ProcessAudio(buffer, bytesRecorded);
 
-                            // ── PASO 1: Acumular bits del bloque ──────────────────────────
+                            // Buscar phasing en todas las fases; una vez detectado,
+                            // decodificar solamente los caracteres de la fase sincronizada.
                             int phaseStart, phaseEnd;
                             if (estado == Estado.Grabando)
                             {
-                                phaseStart = 0;
-                                phaseEnd = PhaseCount;
+                                phaseStart = lockedPhase;
+                                phaseEnd = lockedPhase + 1;
                             }
                             else
                             {
@@ -797,40 +573,44 @@ namespace Demodulador_WinForm_1
                             {
                                 foreach (char bit in bitsByPhase[ph])
                                 {
-                                    Estado estadoActual;
-                                    { estadoActual = estado; }
-
-                                    if (estadoActual == Estado.EsperandoInicio)
+                                    if (estado == Estado.EsperandoInicio)
                                     {
-
                                         syncBuffers[ph].Append(bit);
-                                        if (syncBuffers[ph].Length > startPattern.Length)
+                                        if (syncBuffers[ph].Length > PhasingPatternBits)
                                             syncBuffers[ph].Remove(0, 1);
 
-                                        if (syncBuffers[ph].ToString().EndsWith(startPattern))
+                                        if (TryDetectPhasingPattern(
+                                                syncBuffers[ph], phasingCharacters,
+                                                out PhasingPattern pattern))
                                         {
                                             ClearDisplay();
-                                            LogToDisplay($"DOT PATTERN detectado (fase {ph})");
-                                            IniciarGrabacion(ph);
+                                            IniciarGrabacion(ph, phasingCharacters);
+                                            LogToDisplay($"Phasing {pattern} detectado (fase {ph})\n");
                                         }
-                                        else if (syncBuffers[ph].Length >= 10)
-                                        {
-                                            string sync = syncBuffers[ph].ToString();
-                                            string sub = sync.Substring(sync.Length - 10, 10);
-                                            if (Decodificador.TryDeco(sub, out int v) && v == 125)
-                                            {
-                                                ClearDisplay();
-                                                LogToDisplay($"Valor 125 detectado sin DOT PATTERN (fase {ph})");
-                                                IniciarGrabacion(ph);
-                                            }
-                                        }
-
                                     }
-                                    else if (estadoActual == Estado.Grabando)
+                                    else if (estado == Estado.Grabando && ph == lockedPhase)
                                     {
-                                        { bitAccumulators[ph].Append(bit); }
+                                        bitsPendientes.Append(bit);
+                                        if (bitsPendientes.Length == 10)
+                                        {
+                                            if (TryDecodeDscCharacter(bitsPendientes, 0, out int valor))
+                                                caracteresCapturados.Add(valor);
+                                            else
+                                                caracteresInvalidos++;
+                                            bitsPendientes.Clear();
+                                        }
                                     }
                                 }
+                            }
+
+                            if (estado == Estado.Grabando &&
+                                caracteresCapturados.Count != caracteresMostrados &&
+                                nowTicks >= siguienteDisplayCaracteresTicks)
+                            {
+                                _procesamiento2.MostrarLista(caracteresCapturados);
+                                caracteresMostrados = caracteresCapturados.Count;
+                                siguienteDisplayCaracteresTicks = nowTicks +
+                                    Stopwatch.Frequency * RealtimeDisplayIntervalMs / 1000;
                             }
 
                             // ── PASO 2: Finalizar por tiempo desde el bloqueo de fase ─────
@@ -846,21 +626,19 @@ namespace Demodulador_WinForm_1
                             }
 
 
-                            void IniciarGrabacion(int ph)
+                            void IniciarGrabacion(int ph, List<(int Index, int Value)> phasing)
                             {
-                                ClearMAIN();
-                                triggerPhase = ph;
+                                _procesamiento2.IniciarNuevaCaptura();
                                 lockedPhase = ph;
-                                // No bloqueamos el demodulador a una sola fase: acumulamos
-                                // todas y al final elegimos la que pasa estructura/ECC DSC.
                                 estado = Estado.Grabando;
                                 inicioGrabacionTicks = Stopwatch.GetTimestamp();
-                                for (int p = 0; p < PhaseCount; p++)
-                                {
-                                    bitAccumulators[p].Clear();
-                                    bitAccumulators[p].Append(syncBuffers[p].ToString());
-                                }
-                                LogToDisplay($"[IniciarGrabacion] Fase {ph} bloqueada. Límite={duracionGrabacionMs:F0} ms.");
+                                caracteresCapturados.Clear();
+                                caracteresCapturados.AddRange(phasing.Select(character => character.Value));
+                                bitsPendientes.Clear();
+                                caracteresInvalidos = 0;
+                                caracteresMostrados = 0;
+                                siguienteDisplayCaracteresTicks = 0;
+                                LogToDisplay($"[IniciarGrabacion] Fase {ph} bloqueada. Límite={duracionGrabacionMs:F0} ms.\n");
                             }
 
                             void LimpiarEstadoEntreRecepciones(bool descartarPendientes, bool resetearSecuencia)
@@ -882,13 +660,14 @@ namespace Demodulador_WinForm_1
                                 inicioGrabacionTicks = 0;
 
                                 for (int p = 0; p < PhaseCount; p++)
-                                {
                                     syncBuffers[p].Clear();
-                                    bitAccumulators[p].Clear();
-                                }
+
+                                caracteresCapturados.Clear();
+                                bitsPendientes.Clear();
+                                caracteresInvalidos = 0;
+                                caracteresMostrados = 0;
 
                                 lockedPhase = -1;
-                                triggerPhase = -1;
                                 if (resetearSecuencia)
                                     expectedSequence = ultimaSecuenciaDescartada + 1;
 
@@ -898,19 +677,17 @@ namespace Demodulador_WinForm_1
 
                             void FinalizarCaptura(string motivo)
                             {
-                                string[] candidates = bitAccumulators
-                                    .Select(sb => sb.ToString())
-                                    .ToArray();
-                                string capturado = SelectBestDscCandidate(candidates, triggerPhase, out int selectedPhase, out string selectionDetail);
-                                LogToDisplay($"[FinalizarCaptura - {motivo}] fase={selectedPhase}, {capturado.Length} bits capturados ({selectionDetail})");
-                                if (capturado.Length > 0)
+                                List<int> capturado = new(caracteresCapturados);
+                                LogToDisplay($"[FinalizarCaptura - {motivo}] fase={lockedPhase}, {capturado.Count} caracteres decodificados, {caracteresInvalidos} invalidos.\n");
+                                if (capturado.Count > 0)
                                 {
-                                    _mensajesCapturados.Enqueue(capturado);
+                                    _procesamiento2.Procesar(capturado);
+                                    RegistrarCaptura(false);
                                 }
                                 else
                                 {
-                                    LogToDisplay("[Advertencia] No se encoló mensaje: cadena vacía\n");
-                                    _form?.RegistrarMensajeRecibido(false);
+                                    LogToDisplay("[Advertencia] No se decodificaron caracteres.\n");
+                                    RegistrarCaptura(false);
                                 }
                                 LimpiarEstadoEntreRecepciones(descartarPendientes: true, resetearSecuencia: true);
                                 estado = Estado.Cooldown;
@@ -963,42 +740,6 @@ namespace Demodulador_WinForm_1
                 Name = "DSC-Demodulator"
             };
             _demodThread.Start();
-
-            // ── Thread de procesamiento ──────────────────────────────────────────────
-            // Consume mensajes DSC completos demodulados y llama a Procesar().
-            _processingThread = new Thread(() =>
-            {
-                Thread.CurrentThread.Priority = ThreadPriority.Highest;
-
-                while (!_cts.Token.IsCancellationRequested)
-                {
-                    if (_mensajesCapturados.TryDequeue(out string bits))
-                    {
-                        bool correcto = false;
-                        try
-                        {
-                            correcto = _procesamiento.Procesar(bits);
-                        }
-                        catch (Exception ex)
-                        {
-                            LogToDisplay($"[Error en ProcesarBits] {ex.Message}");
-                        }
-                        finally
-                        {
-                            _form?.RegistrarMensajeRecibido(correcto);
-                        }
-                    }
-                    else
-                    {
-                        Thread.Sleep(10);
-                    }
-                }
-            })
-            {
-                IsBackground = true,
-                Name = "DSC-Processor"
-            };
-            _processingThread.Start();
 
             // ── Callback de audio ────────────────────────────────────────────────────
             // Responsabilidad única: elevar prioridad del thread de NAudio en la primera
@@ -1068,12 +809,11 @@ namespace Demodulador_WinForm_1
             // de cancelación fuera del contexto del try-catch.
             _audioQueue?.CompleteAdding();
 
-            // Cancelar el token de cancelación — detiene DSC-Processor
+            // Cancelar el token de cancelación — detiene el demodulador.
             _cts?.Cancel();
 
-            // Esperar a que ambos threads terminen
+            // Esperar a que el thread termine.
             _demodThread?.Join(2000);
-            _processingThread?.Join(2000);
 
             // Restaurar prioridad del proceso a Normal al detener la captura
             try
