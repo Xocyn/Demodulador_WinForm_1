@@ -16,6 +16,13 @@ namespace Demodulador_WinForm_1
     public class CapturaDatos
     {
         private const int CaptureSampleRate = 48000;
+        private const int RealtimeDisplaySamples = 256;
+        private const int RealtimeDisplayIntervalMs = 200;
+        private const int NoiseCalibrationMilliseconds = 2000;
+        private const double NoiseGateOpenMarginDb = 10.0;
+        private const double NoiseGateCloseMarginDb = 6.0;
+        private const double NoiseGateAttackMilliseconds = 40.0;
+        private const double NoiseGateReleaseMilliseconds = 250.0;
 
         private enum Estado
         {
@@ -48,7 +55,6 @@ namespace Demodulador_WinForm_1
         private IDscDemodulator _demod;
         private Thread _processingThread;
         private bool _isRunning = false;
-        private WaveDisplayManager _waveDisplayManager;
         private readonly Procesamiento _procesamiento;  // ← agregar campo
 
         private bool pausa = false;
@@ -194,11 +200,6 @@ namespace Demodulador_WinForm_1
             }
         }
 
-        private void UpdateWaveDisplay(short[] samples)
-        {
-            _waveDisplayManager?.AddSamples(samples);
-        }
-
         private static double TicksToMilliseconds(long ticks)
         {
             return ticks * 1000.0 / Stopwatch.Frequency;
@@ -212,6 +213,20 @@ namespace Demodulador_WinForm_1
                 if (Interlocked.CompareExchange(ref target, value, current) == current)
                     break;
             }
+        }
+
+        private static short[] CreateDisplaySamples(ReadOnlySpan<short> sourceSamples)
+        {
+            int displayCount = Math.Min(RealtimeDisplaySamples, sourceSamples.Length);
+            short[] displaySamples = new short[displayCount];
+
+            for (int i = 0; i < displayCount; i++)
+            {
+                int sourceIndex = i * sourceSamples.Length / displayCount;
+                displaySamples[i] = sourceSamples[sourceIndex];
+            }
+
+            return displaySamples;
         }
 
         private void ResetAudioDiagnostics()
@@ -363,13 +378,21 @@ namespace Demodulador_WinForm_1
         {
             selectedPhase = -1;
             detail = "sin candidato valido";
+            var filteredCandidates = new string[candidates.Length];
+            var filterDetails = new string[candidates.Length];
 
-            if (preferredPhase >= 0 && preferredPhase < candidates.Length &&
-                TryLooksLikeValidDsc(candidates[preferredPhase], out string preferredDetail))
+            for (int phase = 0; phase < candidates.Length; phase++)
+            {
+                filteredCandidates[phase] =
+                    DscFrameTrimmer.TrimAfterFinalEos(candidates[phase], out filterDetails[phase]);
+            }
+
+            if (preferredPhase >= 0 && preferredPhase < filteredCandidates.Length &&
+                TryLooksLikeValidDsc(filteredCandidates[preferredPhase], out string preferredDetail))
             {
                 selectedPhase = preferredPhase;
-                detail = $"fase preferida valida: {preferredDetail}";
-                return candidates[preferredPhase];
+                detail = $"fase preferida valida: {preferredDetail}; {filterDetails[preferredPhase]}";
+                return filteredCandidates[preferredPhase];
             }
 
             int bestLength = -1;
@@ -379,9 +402,9 @@ namespace Demodulador_WinForm_1
             string fallbackBits = string.Empty;
             string fallbackDetail = string.Empty;
 
-            for (int phase = 0; phase < candidates.Length; phase++)
+            for (int phase = 0; phase < filteredCandidates.Length; phase++)
             {
-                string bits = candidates[phase] ?? string.Empty;
+                string bits = filteredCandidates[phase] ?? string.Empty;
                 if (bits.Length > fallbackLength)
                 {
                     fallbackPhase = phase;
@@ -395,24 +418,28 @@ namespace Demodulador_WinForm_1
                     selectedPhase = phase;
                     bestLength = bits.Length;
                     bestBits = bits;
-                    detail = $"fase alternativa valida: {candidateDetail}";
+                    detail = $"fase alternativa valida: {candidateDetail}; {filterDetails[phase]}";
                 }
             }
 
             if (selectedPhase >= 0)
                 return bestBits;
 
-            if (preferredPhase >= 0 && preferredPhase < candidates.Length &&
-                !string.IsNullOrEmpty(candidates[preferredPhase]))
+            if (preferredPhase >= 0 && preferredPhase < filteredCandidates.Length &&
+                !string.IsNullOrEmpty(filteredCandidates[preferredPhase]))
             {
                 selectedPhase = preferredPhase;
-                TryLooksLikeValidDsc(candidates[preferredPhase], out string preferredFailure);
-                detail = $"fallback fase preferida sin ECC/estructura valida: {preferredFailure}";
-                return candidates[preferredPhase];
+                TryLooksLikeValidDsc(filteredCandidates[preferredPhase], out string preferredFailure);
+                detail =
+                    $"fallback fase preferida sin ECC/estructura valida: {preferredFailure}; " +
+                    filterDetails[preferredPhase];
+                return filteredCandidates[preferredPhase];
             }
 
             selectedPhase = fallbackPhase;
-            detail = $"fallback fase mas larga sin ECC/estructura valida: {fallbackDetail}";
+            detail =
+                $"fallback fase mas larga sin ECC/estructura valida: {fallbackDetail}; " +
+                (fallbackPhase >= 0 ? filterDetails[fallbackPhase] : "sin fase");
             return fallbackBits;
         }
 
@@ -584,6 +611,7 @@ namespace Demodulador_WinForm_1
             _audioQueue = new BlockingCollection<(long, byte[], int, long)>(boundedCapacity: 32);
 
             bool vhfMode = _form.combox_hf_vhf.SelectedIndex == 1;
+            double rxLowPassHz = _form.ObtenerFiltroPasabajosRxHz();
 
             _waveIn = new WaveInEvent();
             _waveIn.DeviceNumber = _form.combox_dispositivos.SelectedIndex;
@@ -594,29 +622,20 @@ namespace Demodulador_WinForm_1
             _demod = usarCorrelacion
                 ? new CorrelationBFSKDemodulator(vhfMode)
                 : new BFSKDemodulator(vhfMode);
-            LogToDisplay($"[Demod] Metodo={(usarCorrelacion ? "Correlacion" : "Actual")}\n");
+            LogToDisplay(
+                $"[Demod] Metodo={(usarCorrelacion ? "Correlacion" : "Actual")}, " +
+                $"banda={(vhfMode ? "VHF" : "MF/HF")}, filtroRx={rxLowPassHz:F0} Hz\n");
+            LogToDisplay(
+                $"[Nivel] Calibrando ruido durante {NoiseCalibrationMilliseconds} ms; " +
+                $"apertura=piso+{NoiseGateOpenMarginDb:F0} dB, " +
+                $"cierre=piso+{NoiseGateCloseMarginDb:F0} dB.\n");
+            LogToDisplay(
+                $"[Rendimiento] Visualización de onda limitada a " +
+                $"{RealtimeDisplaySamples} muestras cada {RealtimeDisplayIntervalMs} ms.\n");
 
             // Instanciar Procesamiento con referencias a los controles del formulario
             //var procesamiento = new Procesamiento(_form.MAINDISPLAY, _form);
 
-
-            // ── Inicializar visualización de onda ────────────────────────────────────
-            // Crear callback que actualice el waveViewer1 de forma thread-safe
-            _waveDisplayManager = new WaveDisplayManager(
-                updateDisplay: (samples) =>
-                {
-                    if (_form?.InvokeRequired == true)
-                    {
-                        _form.Invoke(() => _form.waveViewer1.AddSamples(samples));
-                    }
-                    else
-                    {
-                        _form?.waveViewer1.AddSamples(samples);
-                    }
-                },
-                targetSamples: 4096,      // Mostrar 4096 muestras
-                updateIntervalMs: 50      // Actualizar cada 50ms (~20 FPS)
-            );
 
             // ── Thread de demodulación ───────────────────────────────────────────────
             // Consume bloques de audio crudos de _audioQueue y ejecuta toda la lógica
@@ -639,12 +658,21 @@ namespace Demodulador_WinForm_1
                 for (int p = 0; p < PhaseCount; p++) bitAccumulators[p] = new StringBuilder();
                 const string startPattern = "01010101010101010101";
                 Estado estado = Estado.EsperandoInicio;
-                double umbralEnergiaPorMuestra = Math.Pow(short.MaxValue * 0.01, 2);
-                double silencioRequeridoMs = vhfMode ? 300.0 : 800.0;
-                double silencioRearmeMs = vhfMode ? 700.0 : 1200.0;
-                var silenceDetector = new SilenceDetector(umbralEnergiaPorMuestra, silencioRequeridoMs);
-                var rearmSilenceDetector = new SilenceDetector(umbralEnergiaPorMuestra, silencioRearmeMs);
+                double duracionGrabacionMs = vhfMode ? 2000.0 : 10000.0;
+                double tiempoRearmeMs = vhfMode ? 700.0 : 1200.0;
+                long inicioGrabacionTicks = 0;
+                long inicioRearmeTicks = 0;
                 var rxLowPassFilter = new StreamingLowPassFilter(CaptureSampleRate);
+                var noiseGate = new AdaptiveNoiseGate(
+                    CaptureSampleRate,
+                    NoiseCalibrationMilliseconds,
+                    NoiseGateOpenMarginDb,
+                    NoiseGateCloseMarginDb,
+                    NoiseGateAttackMilliseconds,
+                    NoiseGateReleaseMilliseconds);
+                bool calibrationWasActive = true;
+                bool lastGateOpen = false;
+                long nextLevelDisplayTicks = 0;
                 long expectedSequence = 1;
                 long sequenceGaps = 0;
                 long processedBlocks = 0;
@@ -681,32 +709,72 @@ namespace Demodulador_WinForm_1
                             maxQueueDepth = Math.Max(maxQueueDepth, _audioQueue?.Count ?? 0);
                             maxQueueLatencyTicks = Math.Max(maxQueueLatencyTicks, blockStartTicks - captureTicks);
 
-                            // ── Visualización de onda ─────────────────────────────────────
-                            if (bytesRecorded > 0)
+                            rxLowPassFilter.ProcessInPlace(buffer, bytesRecorded, rxLowPassHz);
+
+                            ReadOnlySpan<short> levelSamples =
+                                MemoryMarshal.Cast<byte, short>(buffer.AsSpan(0, bytesRecorded));
+                            AudioLevelSnapshot level = noiseGate.Update(levelSamples);
+                            long nowTicks = Stopwatch.GetTimestamp();
+
+                            if (nowTicks >= nextLevelDisplayTicks)
                             {
-                                int sampleCount = bytesRecorded / 2;
-                                short[] samples = new short[sampleCount];
-                                Buffer.BlockCopy(buffer, 0, samples, 0, bytesRecorded);
-                                UpdateWaveDisplay(samples);
+                                _form?.MostrarMuestras(CreateDisplaySamples(levelSamples));
+                                _form?.MostrarNivelAudio(level);
+                                nextLevelDisplayTicks = nowTicks +
+                                    Stopwatch.Frequency * RealtimeDisplayIntervalMs / 1000;
                             }
 
+                            if (calibrationWasActive && !level.IsCalibrating)
+                            {
+                                _demod.SetMinRmsThresholdDbFs(level.CloseThresholdDbFs);
+                                _demod.ResetAll();
+                                foreach (var sb in syncBuffers) sb.Clear();
+                                LogToDisplay(
+                                    $"[Nivel] Calibración completa: piso={level.NoiseFloorDbFs:F1} dBFS, " +
+                                    $"abre={level.OpenThresholdDbFs:F1} dBFS, " +
+                                    $"cierra={level.CloseThresholdDbFs:F1} dBFS.\n");
+                            }
+
+                            if (!level.IsCalibrating && level.IsGateOpen != lastGateOpen)
+                            {
+                                LogToDisplay(
+                                    level.IsGateOpen
+                                        ? $"[Nivel] Gate ABIERTO: RMS={level.RmsDbFs:F1} dBFS.\n"
+                                        : $"[Nivel] Gate CERRADO: RMS={level.RmsDbFs:F1} dBFS.\n");
+
+                                if (!level.IsGateOpen && estado == Estado.EsperandoInicio)
+                                {
+                                    _demod.ResetAll();
+                                    foreach (var sb in syncBuffers) sb.Clear();
+                                }
+                            }
+
+                            calibrationWasActive = level.IsCalibrating;
+                            lastGateOpen = level.IsGateOpen;
+
+                            if (level.IsCalibrating)
+                                continue;
+
                             // ── Reposo entre recepciones ───────────────────────────────────
-                            // En esta etapa descartamos el audio completo antes de filtrarlo o
-                            // demodularlo. Solo se mide silencio estable para rearmar limpio.
+                            // En esta etapa descartamos temporalmente el audio antes de volver
+                            // a buscar una nueva trama. El rearme también es temporal para no
+                            // depender de que un canal ruidoso alcance un silencio ideal.
                             if (estado == Estado.Cooldown)
                             {
-                                if (rearmSilenceDetector.Actualizar(buffer, bytesRecorded))
+                                double tiempoEnRearmeMs =
+                                    TicksToMilliseconds(nowTicks - inicioRearmeTicks);
+                                if (tiempoEnRearmeMs >= tiempoRearmeMs)
                                 {
-                                    double silencioDetectadoMs = rearmSilenceDetector.SilencioAcumuladoMs;
                                     LimpiarEstadoEntreRecepciones(descartarPendientes: false, resetearSecuencia: false);
                                     estado = Estado.EsperandoInicio;
-                                    LogToDisplay($"[Reposo] Silencio estable {silencioDetectadoMs:F0} ms. Escuchando...\n");
+                                    LogToDisplay($"[Reposo] Rearme completado tras {tiempoEnRearmeMs:F0} ms. Escuchando...\n");
                                 }
 
                                 continue;
                             }
 
-                            rxLowPassFilter.ProcessInPlace(buffer, bytesRecorded, _form?.ObtenerFiltroPasabajosRxHz() ?? 3000.0);
+                            if (estado == Estado.EsperandoInicio && !level.IsGateOpen)
+                                continue;
 
                             string[] bitsByPhase;
 
@@ -765,15 +833,15 @@ namespace Demodulador_WinForm_1
                                 }
                             }
 
-                            // ── PASO 2: Evaluar silencio ──────────────────────────────────
-
-
+                            // ── PASO 2: Finalizar por tiempo desde el bloqueo de fase ─────
                             if (estado == Estado.Grabando)
                             {
-                                if (silenceDetector.Actualizar(buffer, bytesRecorded))
+                                double tiempoGrabandoMs =
+                                    TicksToMilliseconds(Stopwatch.GetTimestamp() - inicioGrabacionTicks);
+                                if (tiempoGrabandoMs >= duracionGrabacionMs)
                                 {
-                                    LogToDisplay($"[Silencio] {silenceDetector.SilencioAcumuladoMs:F0} ms sin señal → finalizando captura");
-                                    FinalizarCaptura("SILENCIO");
+                                    LogToDisplay($"[Tiempo] {tiempoGrabandoMs:F0} ms desde el bloqueo de fase → finalizando captura");
+                                    FinalizarCaptura("TIEMPO");
                                 }
                             }
 
@@ -786,13 +854,13 @@ namespace Demodulador_WinForm_1
                                 // No bloqueamos el demodulador a una sola fase: acumulamos
                                 // todas y al final elegimos la que pasa estructura/ECC DSC.
                                 estado = Estado.Grabando;
+                                inicioGrabacionTicks = Stopwatch.GetTimestamp();
                                 for (int p = 0; p < PhaseCount; p++)
                                 {
                                     bitAccumulators[p].Clear();
                                     bitAccumulators[p].Append(syncBuffers[p].ToString());
                                 }
-                                silenceDetector.Reset();
-                                LogToDisplay($"[IniciarGrabacion] Fase {ph} bloqueada.");
+                                LogToDisplay($"[IniciarGrabacion] Fase {ph} bloqueada. Límite={duracionGrabacionMs:F0} ms.");
                             }
 
                             void LimpiarEstadoEntreRecepciones(bool descartarPendientes, bool resetearSecuencia)
@@ -811,8 +879,7 @@ namespace Demodulador_WinForm_1
 
                                 _demod.ResetAll();
                                 rxLowPassFilter = new StreamingLowPassFilter(CaptureSampleRate);
-                                silenceDetector.Reset();
-                                rearmSilenceDetector.Reset();
+                                inicioGrabacionTicks = 0;
 
                                 for (int p = 0; p < PhaseCount; p++)
                                 {
@@ -847,7 +914,8 @@ namespace Demodulador_WinForm_1
                                 }
                                 LimpiarEstadoEntreRecepciones(descartarPendientes: true, resetearSecuencia: true);
                                 estado = Estado.Cooldown;
-                                LogToDisplay($"[Reposo] Descartando audio hasta {silencioRearmeMs:F0} ms de silencio estable.\n");
+                                inicioRearmeTicks = Stopwatch.GetTimestamp();
+                                LogToDisplay($"[Reposo] Descartando audio durante {tiempoRearmeMs:F0} ms.\n");
                             }
                         }
                         catch (OperationCanceledException) { break; }
@@ -1020,9 +1088,6 @@ namespace Demodulador_WinForm_1
             _cts?.Dispose();  // ⚠️ Importante: Dispose para liberar recursos
             _cts = null;      // Preparar para la próxima captura
 
-            // Limpiar visualización de onda
-            _waveDisplayManager?.Clear();
-            _waveDisplayManager = null;
         }
 
         public void CambiarModo()

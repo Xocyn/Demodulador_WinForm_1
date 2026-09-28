@@ -315,8 +315,8 @@ namespace Dem_v2
                 return false;
             }
 
-            int eccDx = MESSAGE[MESSAGE.Count - 6];
-            int eccRx = MESSAGE[MESSAGE.Count - 1];
+            int eccDx = MESSAGE[MESSAGE.Count - 6]; //utiliza el primer ECC recibido
+            int eccRx = MESSAGE[MESSAGE.Count - 1]; //utiliza el ultimo ECC recibido
 
             int calculated = 0;
             foreach (int v in ECC)

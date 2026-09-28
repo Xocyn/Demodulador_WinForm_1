@@ -12,6 +12,7 @@ namespace Demodulador_WinForm_1
         private CapturaDatos _capturaDatos;
         private bool _isCapturing = false;
         private readonly Procesamiento _procesamiento;
+        private readonly Label _audioLevelLabel;
         private int _mensajesRecibidosTotales;
         private int _mensajesDemoduladosCorrectos;
         public bool vhf => combox_hf_vhf.SelectedIndex == 1;
@@ -23,6 +24,20 @@ namespace Demodulador_WinForm_1
 
             DISPLAYSECUNDARIO.ReadOnly = true;
             DISPLAYSECUNDARIO.BackColor = Color.White;
+
+            _audioLevelLabel = new Label
+            {
+                AutoSize = true,
+                BackColor = Color.FromArgb(16, 16, 16),
+                ForeColor = Color.White,
+                Font = new Font("Consolas", 10F, FontStyle.Regular, GraphicsUnit.Point),
+                Location = new Point(12, 12),
+                Padding = new Padding(8, 5, 8, 5),
+                TabStop = false,
+                Text = "RMS: -- dBFS | Pico: -- dBFS | Calibrando ruido..."
+            };
+            waveViewer1.Controls.Add(_audioLevelLabel);
+            _audioLevelLabel.BringToFront();
 
             _procesamiento = new Procesamiento(MAINDISPLAY, this);
 
@@ -122,6 +137,50 @@ namespace Demodulador_WinForm_1
                 _mensajesDemoduladosCorrectos++;
 
             ActualizarContadoresMensajes();
+        }
+
+        public void MostrarMuestras(short[] samples)
+        {
+            if (IsDisposed || !IsHandleCreated)
+                return;
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(() => MostrarMuestras(samples));
+                return;
+            }
+
+            waveViewer1.AddSamples(samples);
+        }
+
+        public void MostrarNivelAudio(AudioLevelSnapshot level)
+        {
+            if (IsDisposed || !IsHandleCreated)
+                return;
+
+            if (InvokeRequired)
+            {
+                BeginInvoke(() => MostrarNivelAudio(level));
+                return;
+            }
+
+            string rms = $"RMS: {level.RmsDbFs,6:F1} dBFS";
+            string peak = $"Pico: {level.PeakDbFs,6:F1} dBFS";
+
+            if (level.IsCalibrating)
+            {
+                _audioLevelLabel.ForeColor = Color.Gold;
+                _audioLevelLabel.Text =
+                    $"{rms} | {peak} | Calibrando ruido: {level.CalibrationProgress:P0}";
+                return;
+            }
+
+            _audioLevelLabel.ForeColor = level.IsGateOpen ? Color.Lime : Color.White;
+            string gate = level.IsGateOpen ? "ABIERTO" : "CERRADO";
+            _audioLevelLabel.Text =
+                $"{rms} | {peak} | Gate: {gate}\n" +
+                $"Piso: {level.NoiseFloorDbFs:F1} dBFS | " +
+                $"Cierra: {level.CloseThresholdDbFs:F1} | Abre: {level.OpenThresholdDbFs:F1} dBFS";
         }
 
         private void ActualizarContadoresMensajes()

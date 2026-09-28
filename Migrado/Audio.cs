@@ -8,6 +8,7 @@ public interface IDscDemodulator
 {
     int PhaseCount { get; }
     string[] ProcessAudio(byte[] buffer, int bytesRecorded);
+    void SetMinRmsThresholdDbFs(double thresholdDbFs);
     void ResetTiming();
     void ResetAll();
 }
@@ -19,7 +20,7 @@ public class BFSKDemodulator : IDscDemodulator
     private double _freqBit0;
     private double _freqBit1;
     private readonly double _samplesPerSymbol;
-    private readonly double _energyThreshold;
+    private double _energyThreshold;
 
     // ── Buffer circular de muestras ───────────────────────────────────────────
     // Array de tamaño fijo en lugar de List<short>:
@@ -72,6 +73,13 @@ public class BFSKDemodulator : IDscDemodulator
         _phaseInc1 = 2.0 * Math.PI * _freqBit1 / SampleRate;
         _goertzelCoeff0 = 2.0 * Math.Cos(_phaseInc0);
         _goertzelCoeff1 = 2.0 * Math.Cos(_phaseInc1);
+    }
+
+    public void SetMinRmsThresholdDbFs(double thresholdDbFs)
+    {
+        thresholdDbFs = Math.Clamp(thresholdDbFs, -120.0, 0.0);
+        double minRms = short.MaxValue * Math.Pow(10.0, thresholdDbFs / 20.0);
+        _energyThreshold = minRms * minRms * _samplesPerSymbol;
     }
 
     // ── ResetTiming: volver a modo detección con 4 fases ─────────────────────
@@ -225,7 +233,7 @@ public class CorrelationBFSKDemodulator : IDscDemodulator
     private const int BufSize = 32768;
 
     private readonly double _samplesPerSymbol;
-    private readonly double _energyThreshold;
+    private double _energyThreshold;
     private readonly short[] _buf = new short[BufSize];
     private readonly double[] _accumulators = new double[PhaseCountInternal];
     private readonly double[] _cos0;
@@ -274,6 +282,13 @@ public class CorrelationBFSKDemodulator : IDscDemodulator
         double minRms = short.MaxValue * 0.1;
         _energyThreshold = minRms * minRms * _samplesPerSymbol;
         ResetAll();
+    }
+
+    public void SetMinRmsThresholdDbFs(double thresholdDbFs)
+    {
+        thresholdDbFs = Math.Clamp(thresholdDbFs, -120.0, 0.0);
+        double minRms = short.MaxValue * Math.Pow(10.0, thresholdDbFs / 20.0);
+        _energyThreshold = minRms * minRms * _samplesPerSymbol;
     }
 
     public int PhaseCount => PhaseCountInternal;
