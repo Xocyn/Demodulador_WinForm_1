@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using Demodulador_WinForm_1.Migrado;
 
 namespace Dem_v2
 {
@@ -13,117 +14,205 @@ namespace Dem_v2
         // public strng MMSI {get; set;} = "998844123"// MODIFICABLE SEGUN LA COSTERA 
         static bool VHF = true;
 
-        static public void Decidir(Mensaje msg, bool rtx)
-        { 
-            switch (msg.Formato) // voy a tener que responder a las rtx de ack en este metodo
-            {
-                case 112:
-                    if (rtx)
-                    {
-                        RetransmisionSocorro(msg);    
-                    }
-                    else
-                    {
-                        RespuestaSocorro(msg);
-                    }
-                    break;
-                default:
-                    break;
-            }
-        }
-        static public void RespuestaSocorro(Mensaje msg)
+        static public void Decidir(Mensaje_2 msg, bool rtx)
         {
-            rta.Clear();
-            ecc.Clear();
+            ArgumentNullException.ThrowIfNull(msg);
+            if (msg.Formato != 112)
+                throw new ArgumentException("La respuesta requiere un mensaje de socorro.", nameof(msg));
 
-            // ⚠️ IMPORTANTE: Crear una copia para evitar modificar la lista original
-            List<int> datos_local = new List<int>(msg.data_respuesta);
-            Geografica.EliminarPosicionesImpares(datos_local);
-
-            Convertir.ConvertirNumero(116, rta); Convertir.ConvertirNumero(116, rta); ecc.Add(116);
-            Convertir.ConvertirNumero(112, rta); ecc.Add(112);
-            Convertir.MMSI(rta, ecc, MMSI);
-            Convertir.ConvertirNumero(110, rta); ecc.Add(110);
-            for (int i = 0; i < datos_local.Count; i++)
-            {
-                Convertir.ConvertirNumero(datos_local[i], rta); ecc.Add(datos_local[i]);
-            }
-            Convertir.ConvertirNumero(127, rta); ecc.Add(127);
-            Convertir.ConvertirNumero(Convertir.Mod2Sum7Bits(ecc), rta);
-            Convertir.ConvertirNumero(127, rta); Convertir.ConvertirNumero(127, rta);
-            EOS();
-
-        }
-
-        static public void RetransmisionSocorro(Mensaje msg)
-        {
-            rta.Clear();
-            ecc.Clear();
-            // ⚠️ IMPORTANTE: Crear una copia para evitar modificar la lista original
-            List<int> datos_local = new List<int>(msg.data_respuesta);
-            Geografica.EliminarPosicionesImpares(datos_local);
-            if (msg.formato_rtx == 116)
-            {
-                Convertir.ConvertirNumero(116, rta); Convertir.ConvertirNumero(116, rta); ecc.Add(116);
-                Convertir.ConvertirNumero(112, rta); ecc.Add(112);
-                Convertir.MMSI(rta, ecc, MMSI);
-                Convertir.ConvertirNumero(112, rta); ecc.Add(112);
-                for (int i = 0; i < datos_local.Count; i++)
-                {
-                    Convertir.ConvertirNumero(datos_local[i], rta); ecc.Add(datos_local[i]);
-                }
-                Convertir.ConvertirNumero(127, rta); ecc.Add(127);
-                Convertir.ConvertirNumero(Convertir.Mod2Sum7Bits(ecc), rta);
-                Convertir.ConvertirNumero(127, rta); Convertir.ConvertirNumero(127, rta);
-            }
-            else if (msg.formato_rtx == 120)
-            {
-                Convertir.ConvertirNumero(120, rta); Convertir.ConvertirNumero(120, rta); ecc.Add(120);
-                Convertir.MMSI(rta, ecc, msg.MMSI_RX);
-                Convertir.ConvertirNumero(112, rta); ecc.Add(112);
-                Convertir.MMSI(rta, ecc, MMSI);
-                Convertir.ConvertirNumero(112, rta); ecc.Add(112);
-                for (int i = 0; i < datos_local.Count; i++)
-                {
-                    Convertir.ConvertirNumero(datos_local[i], rta); ecc.Add(datos_local[i]);
-                }
-                Convertir.ConvertirNumero(117, rta); ecc.Add(117);
-                Convertir.ConvertirNumero(Convertir.Mod2Sum7Bits(ecc), rta);
-                Convertir.ConvertirNumero(117, rta); Convertir.ConvertirNumero(117  , rta);
-            }
-            EOS();
-        }
-
-        static public void ACKRTX(Mensaje msg)
-        {
-            rta.Clear();
-            ecc.Clear();
-            // ⚠️ IMPORTANTE: Crear una copia para evitar modificar la lista original
-            List<int> datos_local = new List<int>(msg.data_respuesta);
-            Geografica.EliminarPosicionesImpares(datos_local);
-            Convertir.ConvertirNumero(msg.Formato, rta); Convertir.ConvertirNumero(msg.Formato, rta); ecc.Add(msg.Formato);
-            if (msg.Formato == 116)
-            {
-                Convertir.ConvertirNumero(112, rta); ecc.Add(112);
-                Convertir.MMSI(rta, ecc, MMSI);
-                Convertir.ConvertirNumero(112, rta); ecc.Add(112);
-
-            }
+            if (rtx)
+                RetransmisionSocorro(msg);
             else
+                RespuestaSocorro(msg);
+        }
+
+        static public void RespuestaSocorro(Mensaje_2 msg) =>
+            Enviar(PrepararRespuestaSocorro(msg));
+
+        static public void RetransmisionSocorro(Mensaje_2 msg) =>
+            Enviar(PrepararRetransmisionSocorro(msg));
+
+        static public void ACKRTX(Mensaje_2 msg) =>
+            Enviar(PrepararAckRetransmision(msg));
+
+        public static bool PuedeResponderSocorro(Mensaje_2 msg)
+        {
+            if (msg?.Mensaje_List == null || msg.Formato != 112)
+                return false;
+            IReadOnlyList<int> caracteres = msg.Mensaje_List;
+            int repetido = caracteres.Count > 1 && caracteres[1] == 112 ? 1 : 0;
+            return DatosSocorroCompletos(caracteres, 1 + repetido);
+        }
+
+        public static bool PuedeAcusarRetransmision(Mensaje_2 msg)
+        {
+            if (msg?.Mensaje_List == null || msg.Formato is not (114 or 116 or 120))
+                return false;
+
+            IReadOnlyList<int> caracteres = msg.Mensaje_List;
+            int repetido = caracteres.Count > 1 && caracteres[1] == msg.Formato ? 1 : 0;
+            int indiceCategoria = msg.Formato == 116 ? 1 + repetido : 6 + repetido;
+            int indiceTelemando = msg.Formato == 116 ? 7 + repetido : 12 + repetido;
+            return indiceTelemando < caracteres.Count &&
+                   caracteres[^1] != 122 &&
+                   caracteres[indiceCategoria] == 112 && caracteres[indiceTelemando] == 112 &&
+                   DatosSocorroCompletos(caracteres, indiceTelemando + 1);
+        }
+
+        internal static List<int> PrepararRespuestaSocorro(Mensaje_2 msg)
+        {
+            List<int> datos = DatosSocorro(msg);
+            var caracteres = new List<int> { 116, 116, 112 };
+            caracteres.AddRange(CodificarMmsi(MMSI));
+            caracteres.Add(110);
+            caracteres.AddRange(datos);
+            caracteres.Add(127);
+            return caracteres;
+        }
+
+        internal static List<int> PrepararRetransmisionSocorro(Mensaje_2 msg)
+        {
+            List<int> datos = DatosSocorro(msg);
+            int formato = msg.formato_rtx;
+            if (formato is not (116 or 120))
+                throw new InvalidOperationException("Seleccione AllShips o Individual para la retransmisión.");
+
+            var caracteres = new List<int> { formato, formato };
+            if (formato == 120)
+                caracteres.AddRange(CodificarMmsi(msg.MMSI_RX));
+            caracteres.Add(112);
+            caracteres.AddRange(CodificarMmsi(MMSI));
+            caracteres.Add(112);
+            caracteres.AddRange(datos);
+            caracteres.Add(formato == 120 ? 117 : 127);
+            return caracteres;
+        }
+
+        internal static List<int> PrepararAckRetransmision(Mensaje_2 msg)
+        {
+            if (!PuedeAcusarRetransmision(msg))
+                throw new ArgumentException("El mensaje no contiene una retransmisión de socorro completa.", nameof(msg));
+
+            List<int> datos = DatosSocorro(msg);
+            var caracteres = new List<int> { msg.Formato, msg.Formato };
+            if (msg.Formato != 116)
+                caracteres.AddRange(CodificarMmsi(MmsiTransmisor(msg)));
+            caracteres.Add(112);
+            caracteres.AddRange(CodificarMmsi(MMSI));
+            caracteres.Add(112);
+            caracteres.AddRange(datos);
+            caracteres.Add(122);
+            return caracteres;
+        }
+
+        private static List<int> DatosSocorro(Mensaje_2 msg)
+        {
+            ArgumentNullException.ThrowIfNull(msg);
+            IReadOnlyList<int> caracteres = msg.Mensaje_List;
+            if (caracteres.Count == 0 || caracteres[0] != msg.Formato)
+                throw new ArgumentException("El mensaje recibido no contiene caracteres validados.", nameof(msg));
+
+            int repetido = caracteres.Count > 1 && caracteres[1] == msg.Formato ? 1 : 0;
+            int inicio = msg.Formato switch
             {
-                Convertir.MMSI(rta, ecc, msg.MMSI_RX);
-                Convertir.ConvertirNumero(112, rta); ecc.Add(112);
-                Convertir.MMSI(rta, ecc, MMSI);
-                Convertir.ConvertirNumero(112, rta); ecc.Add(112);
-            }
-            for (int i = 0; i < datos_local.Count; i++)
+                112 => 1 + repetido,
+                114 or 120 => 13 + repetido,
+                116 => 8 + repetido,
+                _ => throw new ArgumentException("Formato sin datos de socorro para responder.", nameof(msg))
+            };
+            const int cantidad = 14; // MMSI, peligro, posición, UTC y siguiente comunicación.
+            if (!DatosSocorroCompletos(caracteres, inicio))
+                throw new ArgumentException("Datos de socorro incompletos.", nameof(msg));
+
+            var datos = new List<int>(cantidad);
+            for (int i = inicio; i < inicio + cantidad; i++)
             {
-                Convertir.ConvertirNumero(datos_local[i], rta); ecc.Add(datos_local[i]);
+                if (caracteres[i] is < 0 or > 127)
+                    throw new ArgumentException("Datos de socorro inválidos.", nameof(msg));
+                datos.Add(caracteres[i]);
             }
-            Convertir.ConvertirNumero(122, rta); ecc.Add(122);
-            Convertir.ConvertirNumero(Convertir.Mod2Sum7Bits(ecc), rta);
-            Convertir.ConvertirNumero(122, rta); Convertir.ConvertirNumero(122, rta);
+            return datos;
+        }
+
+        private static bool DatosSocorroCompletos(IReadOnlyList<int> caracteres, int inicio)
+        {
+            const int cantidad = 14;
+            if (caracteres.Count != inicio + cantidad + 1 ||
+                Dem_v2.General.ACK(caracteres[^1]) == "¿?")
+                return false;
+
+            for (int i = inicio; i < inicio + cantidad; i++)
+                if (caracteres[i] is < 0 or > 127 ||
+                    (i < inicio + 5 && caracteres[i] > 99))
+                    return false;
+            return true;
+        }
+
+        private static string MmsiTransmisor(Mensaje_2 msg)
+        {
+            IReadOnlyList<int> caracteres = msg.Mensaje_List;
+            int repetido = caracteres.Count > 1 && caracteres[1] == msg.Formato ? 1 : 0;
+            int inicio = 7 + repetido;
+            if (inicio + 5 >= caracteres.Count)
+                throw new ArgumentException("MMSI transmisor incompleto.", nameof(msg));
+
+            var mmsi = new StringBuilder(10);
+            for (int i = inicio; i < inicio + 5; i++)
+            {
+                if (caracteres[i] is < 0 or > 99)
+                    throw new ArgumentException("MMSI transmisor inválido.", nameof(msg));
+                mmsi.Append(caracteres[i].ToString("D2"));
+            }
+            return mmsi.ToString();
+        }
+
+        private static List<int> CodificarMmsi(string mmsi)
+        {
+            if (mmsi == null || (mmsi.Length != 9 && mmsi.Length != 10))
+                throw new ArgumentException("El MMSI debe tener 9 o 10 dígitos.", nameof(mmsi));
+            foreach (char digito in mmsi)
+                if (!char.IsAsciiDigit(digito))
+                    throw new ArgumentException("El MMSI sólo puede contener dígitos.", nameof(mmsi));
+
+            if (mmsi.Length == 9)
+                mmsi += "0";
+            var caracteres = new List<int>(5);
+            for (int i = 0; i < mmsi.Length; i += 2)
+                caracteres.Add(int.Parse(mmsi.Substring(i, 2)));
+            return caracteres;
+        }
+
+        private static void Enviar(IReadOnlyList<int> caracteres)
+        {
+            rta.Clear();
+            ecc.Clear();
+            rta.Append(CodificarRespuesta(caracteres));
             EOS();
+        }
+
+        internal static string CodificarRespuesta(IReadOnlyList<int> caracteres)
+        {
+            ArgumentNullException.ThrowIfNull(caracteres);
+            if (caracteres.Count < 3 || caracteres[0] != caracteres[1] ||
+                Dem_v2.General.ACK(caracteres[^1]) == "¿?")
+                throw new ArgumentException("Trama de respuesta incompleta.", nameof(caracteres));
+
+            var bits = new StringBuilder();
+            var valoresEcc = new List<int>(caracteres.Count - 1);
+            for (int i = 0; i < caracteres.Count; i++)
+            {
+                if (caracteres[i] is < 0 or > 127)
+                    throw new ArgumentException("Carácter de respuesta inválido.", nameof(caracteres));
+                Convertir.ConvertirNumero(caracteres[i], bits);
+                if (i != 1) // La segunda copia del formato no participa en el ECC.
+                    valoresEcc.Add(caracteres[i]);
+            }
+
+            int fin = caracteres[^1];
+            Convertir.ConvertirNumero(Convertir.Mod2Sum7Bits(valoresEcc), bits);
+            Convertir.ConvertirNumero(fin, bits);
+            Convertir.ConvertirNumero(fin, bits);
+            return bits.ToString();
         }
         static public void MensajeIndividual(string mmsi_rx, int categoria, int tipo_msg_ind, bool acuse, int canal, int motivo)
         {

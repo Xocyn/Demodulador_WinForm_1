@@ -61,7 +61,7 @@ namespace Demodulador_WinForm_1
             remove => _procesamiento2.MensajeAgregado -= value;
         }
 
-        private bool pausa = false;
+        private volatile bool pausa = false;
 
         private long _audioCallbackSequence;
         private long _audioBlocksReceived;

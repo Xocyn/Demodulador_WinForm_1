@@ -146,6 +146,9 @@ namespace Demodulador_WinForm_1
                 mensaje.Fecha_recepcion.ToString("HH:mm:ss"), "CHECK", mensaje.ack);
             dataGridView1.Rows[0].Tag = mensaje;
             dataGridView1.Rows[0].Cells["see_msg"].Value = "Ver";
+            if (Respuesta.PuedeResponderSocorro(mensaje) ||
+                Respuesta.PuedeAcusarRetransmision(mensaje))
+                dataGridView1.Rows[0].Cells["rta_msg"].Value = "Responder";
         }
 
         public void RegistrarMensajeRecibido(bool correcto)
@@ -257,6 +260,24 @@ namespace Demodulador_WinForm_1
             {
                 if (columna == "see_msg")
                     MostrarVentanaMensaje(new ventana_mensaje(mensajeNuevo));
+                else if (columna == "rta_msg" && Respuesta.PuedeResponderSocorro(mensajeNuevo))
+                    new ack_rtx(mensajeNuevo, _capturaDatos).Show();
+                else if (columna == "rta_msg" && Respuesta.PuedeAcusarRetransmision(mensajeNuevo))
+                {
+                    _capturaDatos.Pause();
+                    try
+                    {
+                        Respuesta.ACKRTX(mensajeNuevo);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"No se pudo enviar el ACK: {ex.Message}", "Respuesta");
+                    }
+                    finally
+                    {
+                        _capturaDatos.Resume();
+                    }
+                }
                 return;
             }
 
@@ -274,15 +295,6 @@ namespace Demodulador_WinForm_1
                 MostrarVentanaMensaje(new ventana_mensaje(msg));
             }
 
-            if (columna == "rta_msg" && msg.Formato == 112)
-            {
-                var ventana_ack_rtx = new ack_rtx(msg);
-                ventana_ack_rtx.Show();
-            }
-            else if (columna == "rta_msg" && msg.primer_telemando == 112) //rtx socorro
-            { 
-                Respuesta.ACKRTX(msg);
-            }
         }
 
         private void MostrarVentanaMensaje(Form ventana)

@@ -14,36 +14,53 @@ namespace Demodulador_WinForm_1.Ventana_rtx_ack
 {
     public partial class ack_rtx : Form
     {
-        private readonly Mensaje _mensaje;
-        private CapturaDatos _capturaDatos;
-        private readonly Procesamiento _procesamiento;
+        private readonly Mensaje_2 _mensaje;
+        private readonly CapturaDatos _capturaDatos;
         bool rtx = false;
-        public ack_rtx(Mensaje msg)
+        public ack_rtx(Mensaje_2 msg, CapturaDatos capturaDatos)
         {
             InitializeComponent();
-            _procesamiento = new Procesamiento();
-            _capturaDatos = new CapturaDatos(_procesamiento);
-            _mensaje = msg;
+            _mensaje = msg ?? throw new ArgumentNullException(nameof(msg));
+            _capturaDatos = capturaDatos ?? throw new ArgumentNullException(nameof(capturaDatos));
             _capturaDatos.Pause();
+            FormClosed += (_, _) => _capturaDatos.Resume();
         }
 
         private void btn_ack_Click(object sender, EventArgs e)
         {
             rtx = false;
-            Respuesta.Decidir(_mensaje, rtx);
-            _capturaDatos.Resume();
+            EnviarRespuesta();
         }
 
         private void btn_rtx_Click(object sender, EventArgs e)
         {
             rtx = true;
-            Respuesta.Decidir(_mensaje, rtx);
-            _capturaDatos.Resume();
+            if (!EnviarRespuesta())
+                return;
             btn_rtx.Enabled = false;
             btn_all.Checked = false;
             btn_ind.Checked = false;
             label_mssirx.Visible = false;
             text_mmsi_rx.Visible = false;
+        }
+
+        private bool EnviarRespuesta()
+        {
+            _capturaDatos.Pause();
+            try
+            {
+                Respuesta.Decidir(_mensaje, rtx);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"No se pudo enviar la respuesta: {ex.Message}", "Respuesta");
+                return false;
+            }
+            finally
+            {
+                _capturaDatos.Resume();
+            }
         }
 
         private void btn_all_CheckedChanged(object sender, EventArgs e)
@@ -73,7 +90,7 @@ namespace Demodulador_WinForm_1.Ventana_rtx_ack
                 e.Handled = true;
             }
 
-            // Limitar a 6 caracteres
+            // El MMSI tiene 9 dígitos.
             if (text_mmsi_rx.Text.Length >= 9 && !char.IsControl(e.KeyChar))
             {
                 e.Handled = true;
@@ -84,18 +101,23 @@ namespace Demodulador_WinForm_1.Ventana_rtx_ack
 
         private void VerificarCondiciones()
         {
-            bool isIndividualSelected = btn_ind.Checked;
-            bool isAllSelected = btn_all.Checked;
-            if (isIndividualSelected && text_mmsi_rx.Text.Length == 9)
-            { 
-                btn_rtx.Enabled = true;
+            bool mmsiValido = text_mmsi_rx.Text.Length == 9 &&
+                text_mmsi_rx.Text.All(char.IsAsciiDigit);
+            btn_rtx.Enabled = btn_all.Checked || (btn_ind.Checked && mmsiValido);
+            if (btn_ind.Checked && mmsiValido)
+            {
                 _mensaje.formato_rtx = 120;
                 _mensaje.MMSI_RX = text_mmsi_rx.Text;
             }
-            else if (isAllSelected)
+            else if (btn_all.Checked)
             {
-                btn_rtx.Enabled = true;
                 _mensaje.formato_rtx = 116;
+                _mensaje.MMSI_RX = string.Empty;
+            }
+            else
+            {
+                _mensaje.formato_rtx = 0;
+                _mensaje.MMSI_RX = string.Empty;
             }
         }
 
