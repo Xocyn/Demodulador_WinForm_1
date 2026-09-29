@@ -54,6 +54,12 @@ namespace Demodulador_WinForm_1
         private bool _isRunning = false;
         private readonly Procesamiento2 _procesamiento2;
 
+        internal event Action<Mensaje_2> MensajeAgregado
+        {
+            add => _procesamiento2.MensajeAgregado += value;
+            remove => _procesamiento2.MensajeAgregado -= value;
+        }
+
         private bool pausa = false;
 
         private long _audioCallbackSequence;

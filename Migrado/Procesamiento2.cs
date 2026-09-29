@@ -10,6 +10,16 @@ namespace Demodulador_WinForm_1.Migrado
     {
         private readonly RichTextBox? _mainDisplay;
         private List<int>? _mensajeValidado;
+        private readonly List<Mensaje_2> _historial = new();
+        private readonly object _historialLock = new();
+
+        public event Action<Mensaje_2>? MensajeAgregado;
+
+        public IReadOnlyList<Mensaje_2> ObtenerHistorial()
+        {
+            lock (_historialLock)
+                return _historial.ToArray();
+        }
 
         private readonly record struct EstadoEcc(int PrimerValor, bool FormatoDuplicado, int Xor);
 
@@ -175,6 +185,7 @@ namespace Demodulador_WinForm_1.Migrado
                 rutas = siguientes;
             }
 
+            Mensaje_2? mensajeParaHistorial = null;
             var resultado = new StringBuilder();
             resultado.AppendLine($"Lista desde formato: [{string.Join(", ", caracteres)}]");
             resultado.AppendLine($"Pares inspeccionados: {paresInspeccionados}; diferencias: {diferencias}");
@@ -186,7 +197,17 @@ namespace Demodulador_WinForm_1.Migrado
                 resultado.AppendLine($"Fin: {Dem_v2.General.ACK(_mensajeValidado[^1])}");
                 resultado.AppendLine($"ECC calculado={mejorEcc}; recibido DX={mejorEccDx}, RX={mejorEccRx}");
                 resultado.AppendLine();
-                resultado.Append(TipoMensajes.Decodificar(_mensajeValidado));
+                string textoDecodificado = TipoMensajes.Decodificar(_mensajeValidado);
+                resultado.Append(textoDecodificado);
+                mensajeParaHistorial = new Mensaje_2
+                {
+                    Mensaje_List = new List<int>(_mensajeValidado),
+                    Fecha_recepcion = DateTime.Now,
+                    Formato = _mensajeValidado[0],
+                    categoria = CategoriaMensaje(_mensajeValidado),
+                    ack = Dem_v2.General.ACK(_mensajeValidado[^1]),
+                    TextoDecodificado = textoDecodificado
+                };
             }
             else if (!finEncontrado)
                 resultado.AppendLine("Fin de secuencia no encontrado; mensaje inválido.");
@@ -196,7 +217,30 @@ namespace Demodulador_WinForm_1.Migrado
                 resultado.AppendLine("Ninguna combinación verifica el ECC; mensaje inválido.");
 
             ActualizarDisplay(resultado.ToString());
+            if (mensajeParaHistorial != null)
+            {
+                lock (_historialLock)
+                    _historial.Insert(0, mensajeParaHistorial);
+                MensajeAgregado?.Invoke(mensajeParaHistorial);
+            }
             return mejorMensaje != null;
+        }
+
+        private static string CategoriaMensaje(IReadOnlyList<int> mensaje)
+        {
+            if (mensaje[0] == 112)
+                return Dem_v2.General.Categoria(112);
+
+            int formatoRepetido = mensaje.Count > 1 && mensaje[1] == mensaje[0] ? 1 : 0;
+            int indice = mensaje[0] switch
+            {
+                102 or 114 or 120 => 6 + formatoRepetido,
+                116 => 1 + formatoRepetido,
+                _ => -1
+            };
+            return indice >= 0 && indice < mensaje.Count - 1
+                ? Dem_v2.General.Categoria(mensaje[indice])
+                : "¿?";
         }
 
         private static bool EsFinDeSecuencia(int valor) =>
@@ -232,9 +276,10 @@ namespace Demodulador_WinForm_1.Migrado
 
     public class Mensaje_2
     {
-        public List<int> Mensaje_List { get; set; }
+        public List<int> Mensaje_List { get; set; } = new();
         public DateTime Fecha_recepcion { get; set; }
         public string ack { get; set; } = string.Empty;
+        public string TextoDecodificado { get; set; } = string.Empty;
         public List<int> data_respuesta { get; set; }
         public int Formato { get; set; }
         public bool extension { get; set; }

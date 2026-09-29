@@ -1,5 +1,6 @@
 ﻿using Dem_v2;
 using Demodulador_WinForm_1.Ventana_new;
+using Demodulador_WinForm_1.Migrado;
 using Demodulador_WinForm_1.Ventana_rtas;
 using Demodulador_WinForm_1.Ventana_rtx_ack;
 using NAudio.Wave;
@@ -47,6 +48,7 @@ namespace Demodulador_WinForm_1
             dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
 
             _capturaDatos = new CapturaDatos(_procesamiento, this);
+            _capturaDatos.MensajeAgregado += AgregarMensajeHistorial;
             ActualizarContadoresMensajes();
 
             for (int i = 0; i < WaveInEvent.DeviceCount; i++)
@@ -122,6 +124,28 @@ namespace Demodulador_WinForm_1
                 // Estamos en el thread de UI, actualizar directamente
                 dataGridView1.Rows.Insert(0, formato, categoria, hora, ecc, rta);
             }
+        }
+
+        private void AgregarMensajeHistorial(Mensaje_2 mensaje)
+        {
+            if (IsDisposed || !IsHandleCreated)
+                return;
+
+            if (InvokeRequired)
+            {
+                try
+                {
+                    BeginInvoke(() => AgregarMensajeHistorial(mensaje));
+                }
+                catch (InvalidOperationException) { } // El formulario se cerró durante la captura.
+                return;
+            }
+
+            dataGridView1.Rows.Insert(0,
+                FormatSpecifier.titulo(mensaje.Formato), mensaje.categoria,
+                mensaje.Fecha_recepcion.ToString("HH:mm:ss"), "CHECK", mensaje.ack);
+            dataGridView1.Rows[0].Tag = mensaje;
+            dataGridView1.Rows[0].Cells["see_msg"].Value = "Ver";
         }
 
         public void RegistrarMensajeRecibido(bool correcto)
@@ -226,7 +250,15 @@ namespace Demodulador_WinForm_1
 
         private void dataGridView1_CellContentClick(object sender, DataGridViewCellEventArgs e)
         {
-            if (e.RowIndex < 0) return;
+            if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
+
+            string columna = dataGridView1.Columns[e.ColumnIndex].Name;
+            if (dataGridView1.Rows[e.RowIndex].Tag is Mensaje_2 mensajeNuevo)
+            {
+                if (columna == "see_msg")
+                    MostrarVentanaMensaje(new ventana_mensaje(mensajeNuevo));
+                return;
+            }
 
             Mensaje msg = null;
             lock (_procesamiento.HistorialLock)
@@ -237,29 +269,27 @@ namespace Demodulador_WinForm_1
 
             if (msg == null) return;
 
-            if (dataGridView1.Columns[e.ColumnIndex].Name == "see_msg")
+            if (columna == "see_msg")
             {
-                var ventana = new ventana_mensaje(msg);
-
-                this.Enabled = false;
-
-                ventana.FormClosed += (s, args) =>
-                {
-                    this.Enabled = true;
-                };
-
-                ventana.Show();
+                MostrarVentanaMensaje(new ventana_mensaje(msg));
             }
 
-            if (dataGridView1.Columns[e.ColumnIndex].Name == "rta_msg" && msg.Formato == 112)
+            if (columna == "rta_msg" && msg.Formato == 112)
             {
                 var ventana_ack_rtx = new ack_rtx(msg);
                 ventana_ack_rtx.Show();
             }
-            else if (dataGridView1.Columns[e.ColumnIndex].Name == "rta_msg" && msg.primer_telemando == 112) //rtx socorro
+            else if (columna == "rta_msg" && msg.primer_telemando == 112) //rtx socorro
             { 
                 Respuesta.ACKRTX(msg);
             }
+        }
+
+        private void MostrarVentanaMensaje(Form ventana)
+        {
+            Enabled = false;
+            ventana.FormClosed += (_, _) => Enabled = true;
+            ventana.Show();
         }
 
         private void detener_Click(object sender, EventArgs e)

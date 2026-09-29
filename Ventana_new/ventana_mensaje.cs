@@ -12,10 +12,24 @@ namespace Demodulador_WinForm_1.Ventana_new
 {
     public partial class ventana_mensaje : Form
     {
-        private readonly Metodos _metodos;
-        private readonly Mensaje _mensaje;
+        private readonly Metodos? _metodos;
+        private readonly Mensaje? _mensaje;
         private readonly DisplayLogger _logger;
-        private readonly Expansion _expansion;
+        private readonly Expansion? _expansion;
+
+        public ventana_mensaje(Mensaje_2 msg)
+        {
+            ArgumentNullException.ThrowIfNull(msg);
+            InitializeComponent();
+            txt_msj.ReadOnly = true;
+            txt_msj.BackColor = Color.White;
+            _logger = new DisplayLogger(txt_msj);
+            txt_msj.Text = $"Recibido: {msg.Fecha_recepcion:dd/MM/yyyy HH:mm:ss}{Environment.NewLine}" +
+                $"ECC: correcto{Environment.NewLine}{Environment.NewLine}" +
+                msg.TextoDecodificado + Environment.NewLine +
+                $"Caracteres validados: [{string.Join(", ", msg.Mensaje_List)}]";
+        }
+
         public ventana_mensaje(Mensaje msg)
         {
             InitializeComponent();
