@@ -25,6 +25,8 @@ namespace Demodulador_WinForm_1.Migrado
 
         private sealed record NodoMensaje(NodoMensaje? Anterior, int Valor);
 
+        private sealed record ResultadoExtension(List<int>? Caracteres, string Diagnostico);
+
         private sealed class RutasEcc
         {
             public BigInteger Cantidad { get; set; }
@@ -86,6 +88,7 @@ namespace Demodulador_WinForm_1.Migrado
             BigInteger combinacionesVerificadas = BigInteger.Zero;
             BigInteger combinacionesValidas = BigInteger.Zero;
             NodoMensaje? mejorMensaje = null;
+            int mejorIndiceFin = -1;
             int mejoresSeleccionesRx = int.MaxValue;
             int mejorEcc = -1;
             int mejorEccDx = -1;
@@ -155,6 +158,7 @@ namespace Demodulador_WinForm_1.Migrado
                                 if (seleccionesRx < mejoresSeleccionesRx)
                                 {
                                     mejorMensaje = nodo;
+                                    mejorIndiceFin = i;
                                     mejoresSeleccionesRx = seleccionesRx;
                                     mejorEcc = calculado;
                                     mejorEccDx = eccDx;
@@ -208,6 +212,28 @@ namespace Demodulador_WinForm_1.Migrado
                     ack = Dem_v2.General.ACK(_mensajeValidado[^1]),
                     TextoDecodificado = textoDecodificado
                 };
+
+                int inicioExtension = mejorIndiceFin + 8;
+                if (HayExtension(caracteres, inicioExtension))
+                {
+                    ResultadoExtension extension = ValidarExtension(caracteres, inicioExtension);
+                    resultado.AppendLine();
+                    resultado.AppendLine(extension.Diagnostico);
+                    mensajeParaHistorial.extension = true;
+                    if (extension.Caracteres != null)
+                    {
+                        string textoExtension = Extension2.Decodificar(extension.Caracteres);
+                        resultado.Append(textoExtension);
+                        mensajeParaHistorial.Mensaje_ext = extension.Caracteres;
+                        mensajeParaHistorial.TextoDecodificado +=
+                            Environment.NewLine + textoExtension;
+                    }
+                    else
+                    {
+                        mensajeParaHistorial.TextoDecodificado +=
+                            Environment.NewLine + extension.Diagnostico;
+                    }
+                }
             }
             else if (!finEncontrado)
                 resultado.AppendLine("Fin de secuencia no encontrado; mensaje inválido.");
@@ -245,6 +271,116 @@ namespace Demodulador_WinForm_1.Migrado
 
         private static bool EsFinDeSecuencia(int valor) =>
             Dem_v2.General.ACK(valor) != "¿?";
+
+        private static bool EsEspecificadorExtension(int valor) => valor is >= 100 and <= 106;
+
+        private static bool HayExtension(IReadOnlyList<int> caracteres, int inicio) =>
+            inicio + 5 < caracteres.Count &&
+            (EsEspecificadorExtension(caracteres[inicio]) ||
+             EsEspecificadorExtension(caracteres[inicio + 5]));
+
+        private static ResultadoExtension ValidarExtension(IReadOnlyList<int> caracteres, int inicio)
+        {
+            var rutas = new Dictionary<int, RutasEcc>
+            {
+                [0] = new RutasEcc(BigInteger.One, null, 0)
+            };
+            NodoMensaje? mejorMensaje = null;
+            int mejoresSeleccionesRx = int.MaxValue;
+            int mejorEcc = -1;
+            int mejorEccDx = -1;
+            int mejorEccRx = -1;
+            int paresInspeccionados = 0;
+            int diferencias = 0;
+            BigInteger combinacionesVerificadas = BigInteger.Zero;
+            BigInteger combinacionesValidas = BigInteger.Zero;
+            bool finEncontrado = false;
+            bool eccDisponible = false;
+
+            // La extensión tiene un ECC propio: se aplica XOR a todos sus caracteres,
+            // incluido su especificador y su carácter de fin.
+            for (int i = inicio; i + 5 < caracteres.Count && rutas.Count > 0; i += 2)
+            {
+                int original = caracteres[i];
+                int retransmitido = caracteres[i + 5];
+                if (original != retransmitido)
+                    diferencias++;
+                paresInspeccionados++;
+
+                var siguientes = new Dictionary<int, RutasEcc>();
+                foreach (var (xor, ruta) in rutas)
+                {
+                    int opciones = original == retransmitido ? 1 : 2;
+                    for (int opcion = 0; opcion < opciones; opcion++)
+                    {
+                        bool usarRx = opcion == 1;
+                        int valor = usarRx ? retransmitido : original;
+                        if (valor < 0 || (i == inicio && !EsEspecificadorExtension(valor)))
+                            continue;
+
+                        int nuevoXor = xor ^ valor;
+                        var nodo = new NodoMensaje(ruta.Ejemplo, valor);
+                        int seleccionesRx = ruta.SeleccionesRx + (usarRx ? 1 : 0);
+                        if (EsFinDeSecuencia(valor))
+                        {
+                            finEncontrado = true;
+                            int eccDx = i + 2 < caracteres.Count ? caracteres[i + 2] : -1;
+                            int eccRx = i + 7 < caracteres.Count ? caracteres[i + 7] : -1;
+                            if (eccDx < 0 && eccRx < 0)
+                                continue;
+
+                            eccDisponible = true;
+                            combinacionesVerificadas += ruta.Cantidad;
+                            int calculado = nuevoXor & 0x7F;
+                            if (CoincideEcc(calculado, eccDx, eccRx))
+                            {
+                                combinacionesValidas += ruta.Cantidad;
+                                if (seleccionesRx < mejoresSeleccionesRx)
+                                {
+                                    mejorMensaje = nodo;
+                                    mejoresSeleccionesRx = seleccionesRx;
+                                    mejorEcc = calculado;
+                                    mejorEccDx = eccDx;
+                                    mejorEccRx = eccRx;
+                                }
+                            }
+                            continue;
+                        }
+
+                        if (siguientes.TryGetValue(nuevoXor, out RutasEcc? acumuladas))
+                        {
+                            acumuladas.Cantidad += ruta.Cantidad;
+                            if (seleccionesRx < acumuladas.SeleccionesRx)
+                            {
+                                acumuladas.Ejemplo = nodo;
+                                acumuladas.SeleccionesRx = seleccionesRx;
+                            }
+                        }
+                        else
+                        {
+                            siguientes.Add(nuevoXor,
+                                new RutasEcc(ruta.Cantidad, nodo, seleccionesRx));
+                        }
+                    }
+                }
+                rutas = siguientes;
+            }
+
+            string resumen = $"Extensión: pares inspeccionados={paresInspeccionados}; diferencias={diferencias}; " +
+                $"combinaciones verificadas con ECC={combinacionesVerificadas}; válidas={combinacionesValidas}.";
+            if (mejorMensaje != null)
+            {
+                List<int> validada = ReconstruirMensaje(mejorMensaje);
+                return new ResultadoExtension(validada,
+                    $"{resumen}{Environment.NewLine}ECC de extensión correcto: " +
+                    $"calculado={mejorEcc}; recibido DX={mejorEccDx}, RX={mejorEccRx}.{Environment.NewLine}" +
+                    $"Caracteres de extensión: [{string.Join(", ", validada)}]");
+            }
+
+            string motivo = !finEncontrado ? "fin no encontrado" :
+                !eccDisponible ? "ECC no recibido" : "ninguna combinación verifica el ECC";
+            return new ResultadoExtension(null, $"{resumen} Extensión inválida: {motivo}.");
+        }
 
         private static List<int> ReconstruirMensaje(NodoMensaje ultimo)
         {

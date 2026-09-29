@@ -19,6 +19,7 @@ namespace Demodulador_WinForm_1
         private const int CaptureSampleRate = 48000;
         private const int RealtimeDisplaySamples = 256;
         private const int RealtimeDisplayIntervalMs = 200;
+        private const double ExtensionExtraCaptureMs = 500.0;
         private const int PhasingPatternBits = 30;
         private const int NoiseCalibrationMilliseconds = 2000;
         private const double NoiseGateOpenMarginDb = 10.0;
@@ -287,6 +288,37 @@ namespace Demodulador_WinForm_1
             return Decodificador.TryDecodificarMensaje(encoded, out value);
         }
 
+        private static bool DetectarInicioExtension(IReadOnlyList<int> caracteres)
+        {
+            int ultimo = caracteres.Count - 1;
+            if (ultimo < 8 || caracteres[ultimo] is < 100 or > 106)
+                return false;
+
+            int inicioFormato = 0;
+            while (inicioFormato < caracteres.Count &&
+                   FormatSpecifier.Formato(caracteres[inicioFormato]) ==
+                       FormatSpecifier.ValorNoReconocido)
+                inicioFormato++;
+            if (inicioFormato == caracteres.Count)
+                return false;
+
+            // El primer carácter de extensión aparece ocho posiciones después
+            // del EOS original, una vez recibidas las copias DX/RX del ECC.
+            // También se admite su retransmisión, cinco posiciones más tarde.
+            return HayFinAnterior(ultimo - 8) || HayFinAnterior(ultimo - 13);
+
+            bool HayFinAnterior(int indiceFin)
+            {
+                if (indiceFin < inicioFormato ||
+                    (indiceFin - inicioFormato) % 2 != 0 ||
+                    indiceFin + 7 >= caracteres.Count)
+                    return false;
+
+                return General.ACK(caracteres[indiceFin]) != "¿?" ||
+                       General.ACK(caracteres[indiceFin + 5]) != "¿?";
+            }
+        }
+
         // ── Detector de silencio ─────────────────────────────────────────────────
         // Acumula la duración del silencio continuo en el audio crudo.
         // Opera sobre los bytes del callback DataAvailable, antes de cualquier
@@ -436,7 +468,9 @@ namespace Demodulador_WinForm_1
                 int caracteresMostrados = 0;
                 long siguienteDisplayCaracteresTicks = 0;
                 Estado estado = Estado.EsperandoInicio;
-                double duracionGrabacionMs = vhfMode ? 2200.0 : 10000.0; //SI TIENE EXTENSION NO FUNCIONA
+                double duracionBaseGrabacionMs = vhfMode ? 2200.0 : 10000.0;
+                double duracionGrabacionMs = duracionBaseGrabacionMs;
+                bool extensionDetectada = false;
                 double tiempoRearmeMs = vhfMode ? 700.0 : 1200.0;
                 long inicioGrabacionTicks = 0;
                 long inicioRearmeTicks = 0;
@@ -608,6 +642,12 @@ namespace Demodulador_WinForm_1
                                                 caracteresInvalidos++;
                                             }
                                             bitsPendientes.Clear();
+                                            if (!extensionDetectada && DetectarInicioExtension(caracteresCapturados))
+                                            {
+                                                extensionDetectada = true;
+                                                duracionGrabacionMs = duracionBaseGrabacionMs + ExtensionExtraCaptureMs;
+                                                LogToDisplay($"[Extensión] Especificador detectado; límite de captura ampliado a {duracionGrabacionMs:F0} ms.\n");
+                                            }
                                         }
                                     }
                                 }
@@ -642,6 +682,8 @@ namespace Demodulador_WinForm_1
                                 lockedPhase = ph;
                                 estado = Estado.Grabando;
                                 inicioGrabacionTicks = Stopwatch.GetTimestamp();
+                                duracionGrabacionMs = duracionBaseGrabacionMs;
+                                extensionDetectada = false;
                                 caracteresCapturados.Clear();
                                 caracteresCapturados.AddRange(phasing.Select(character => character.Value));
                                 bitsPendientes.Clear();
@@ -668,6 +710,8 @@ namespace Demodulador_WinForm_1
                                 _demod.ResetAll();
                                 rxLowPassFilter = new StreamingLowPassFilter(CaptureSampleRate);
                                 inicioGrabacionTicks = 0;
+                                duracionGrabacionMs = duracionBaseGrabacionMs;
+                                extensionDetectada = false;
 
                                 for (int p = 0; p < PhaseCount; p++)
                                     syncBuffers[p].Clear();

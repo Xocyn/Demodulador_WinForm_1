@@ -28,6 +28,9 @@ namespace Demodulador_WinForm_1.Ventana_new
                 $"ECC: correcto{Environment.NewLine}{Environment.NewLine}" +
                 msg.TextoDecodificado + Environment.NewLine +
                 $"Caracteres validados: [{string.Join(", ", msg.Mensaje_List)}]";
+            if (msg.Mensaje_ext != null)
+                txt_msj.AppendText($"{Environment.NewLine}Caracteres de extensión validados: " +
+                    $"[{string.Join(", ", msg.Mensaje_ext)}]");
         }
 
         public ventana_mensaje(Mensaje msg)
