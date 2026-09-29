@@ -159,8 +159,7 @@ namespace Demodulador_WinForm_1
             }
         }
 
-        // Se conserva el parámetro Procesamiento para las ventanas que aún usan el constructor anterior.
-        public CapturaDatos(Procesamiento procesamiento, Demodulador_DSC form = null)
+        public CapturaDatos(Demodulador_DSC form = null)
         {
             _form = form;
             _procesamiento2 = new Procesamiento2(form?.MAINDISPLAY);

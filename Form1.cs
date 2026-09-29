@@ -12,7 +12,6 @@ namespace Demodulador_WinForm_1
     {
         private CapturaDatos _capturaDatos;
         private bool _isCapturing = false;
-        private readonly Procesamiento _procesamiento;
         private readonly Label _audioLevelLabel;
         private int _mensajesRecibidosTotales;
         private int _mensajesDemoduladosCorrectos;
@@ -40,14 +39,12 @@ namespace Demodulador_WinForm_1
             waveViewer1.Controls.Add(_audioLevelLabel);
             _audioLevelLabel.BringToFront();
 
-            _procesamiento = new Procesamiento(MAINDISPLAY, this);
-
             //this.WindowState = FormWindowState.Maximized;
             dataGridView1.AllowUserToAddRows = false;
             dataGridView1.RowHeadersVisible = false;
             dataGridView1.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
 
-            _capturaDatos = new CapturaDatos(_procesamiento, this);
+            _capturaDatos = new CapturaDatos(this);
             _capturaDatos.MensajeAgregado += AgregarMensajeHistorial;
             ActualizarContadoresMensajes();
 
@@ -106,24 +103,6 @@ namespace Demodulador_WinForm_1
         private void splitContainer1_Panel2_Paint(object sender, PaintEventArgs e)
         {
 
-        }
-
-        /// <summary>
-        /// Agrega una fila a la tabla de forma thread-safe.
-        /// Detecta si estamos en el thread de UI y usa Invoke() si es necesario.
-        /// </summary>
-        public void AgregarFila(string formato, string categoria, string hora, string ecc, string rta)
-        {
-            if (dataGridView1.InvokeRequired)
-            {
-                // Estamos en un thread diferente, usar Invoke para actualizar UI
-                this.Invoke(() => AgregarFila(formato, categoria, hora, ecc, rta));
-            }
-            else
-            {
-                // Estamos en el thread de UI, actualizar directamente
-                dataGridView1.Rows.Insert(0, formato, categoria, hora, ecc, rta);
-            }
         }
 
         private void AgregarMensajeHistorial(Mensaje_2 mensaje)
@@ -279,20 +258,6 @@ namespace Demodulador_WinForm_1
                     }
                 }
                 return;
-            }
-
-            Mensaje msg = null;
-            lock (_procesamiento.HistorialLock)
-            {
-                if (e.RowIndex < _procesamiento.HISTORIAL.Count)
-                    msg = _procesamiento.HISTORIAL[e.RowIndex];
-            }
-
-            if (msg == null) return;
-
-            if (columna == "see_msg")
-            {
-                MostrarVentanaMensaje(new ventana_mensaje(msg));
             }
 
         }

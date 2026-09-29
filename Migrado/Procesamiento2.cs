@@ -416,13 +416,11 @@ namespace Demodulador_WinForm_1.Migrado
         public DateTime Fecha_recepcion { get; set; }
         public string ack { get; set; } = string.Empty;
         public string TextoDecodificado { get; set; } = string.Empty;
-        public List<int> data_respuesta { get; set; }
         public int Formato { get; set; }
         public bool extension { get; set; }
         public string categoria { get; set; } = string.Empty;
         public List<int>? Mensaje_ext { get; set; } // Acepta NULLs
         public string MMSI_RX { get; set; } = string.Empty;
         public int formato_rtx { get; set; }
-        public int primer_telemando { get; set; }
     }
 }

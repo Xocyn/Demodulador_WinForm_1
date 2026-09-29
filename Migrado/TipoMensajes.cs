@@ -217,7 +217,7 @@ namespace Demodulador_WinForm_1.Migrado
                 return "SOCORRO (112): falta un carácter de fin válido.";
 
             // La lista validada por ECC contiene sólo los caracteres originales,
-            // sin los caracteres retransmitidos que intercalaba Procesamiento.
+            // sin los caracteres retransmitidos de la trama original.
             int inicioMmsi = mensaje.Count > 1 && mensaje[1] == 112 ? 2 : 1;
             int indicePeligro = inicioMmsi + 5;
             int inicioCoordenadas = indicePeligro + 1;

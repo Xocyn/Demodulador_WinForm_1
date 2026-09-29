@@ -366,60 +366,6 @@ namespace Dem_v2
             dot.Clear();
         }
 
-        /// <summary>
-        /// Reproduce un archivo de audio y captura simultáneamente el audio del altavoz (loopback).
-        /// Demodula el audio capturado y lo procesa automáticamente.
-        /// </summary>
-        static private async Task PlayAndCaptureAsync(string wavFile, Procesamiento procesamiento, string ondaBinaria)
-        {
-            try
-            {
-                using (var loopback = new LoopbackAudioCapture())
-                {
-                    // Iniciar captura antes de reproducir
-                    loopback.StartCapture();
-
-                    // Reproducir audio sin bloquear
-                    var playTask = AudioPlayer.PlayAsync(wavFile);
-
-                    // Esperar a que termine la reproducción
-                    await playTask;
-
-                    // Dar un margen para que se capture todo el audio
-                    await Task.Delay(500);
-
-                    // Detener captura
-                    byte[] capturedAudio = loopback.StopCapture();
-
-                    if (capturedAudio.Length > 0)
-                    {
-                        // Demodular el audio capturado
-                        var demodulator = new BFSKDemodulator(VHF);
-                        string[] decodedBits = demodulator.ProcessAudio(capturedAudio, capturedAudio.Length);
-
-                        // Usar la primera fase que tenga datos
-                        string resultado = decodedBits.FirstOrDefault(s => !string.IsNullOrEmpty(s)) ?? ondaBinaria;
-
-                        // Procesar la onda demodulada
-                        if (!string.IsNullOrEmpty(resultado))
-                        {
-                            procesamiento.Procesar(resultado);
-                        }
-                    }
-                    else
-                    {
-                        // Si la captura de loopback falló, usar la onda binaria generada
-                        procesamiento.Procesar(ondaBinaria);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error en PlayAndCaptureAsync: {ex.Message}");
-                // Fallback: procesar la onda binaria directamente
-                procesamiento.Procesar(ondaBinaria);
-            }
-        }
         internal class Convertir
         {
             public static void ConvertirNumero(int leido, StringBuilder resultadoConChequeo)
