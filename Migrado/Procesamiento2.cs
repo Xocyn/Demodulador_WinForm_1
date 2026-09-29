@@ -185,6 +185,8 @@ namespace Demodulador_WinForm_1.Migrado
                 resultado.AppendLine($"Mensaje válido: [{string.Join(", ", _mensajeValidado)}]");
                 resultado.AppendLine($"Fin: {Dem_v2.General.ACK(_mensajeValidado[^1])}");
                 resultado.AppendLine($"ECC calculado={mejorEcc}; recibido DX={mejorEccDx}, RX={mejorEccRx}");
+                resultado.AppendLine();
+                resultado.Append(TipoMensajes.Decodificar(_mensajeValidado));
             }
             else if (!finEncontrado)
                 resultado.AppendLine("Fin de secuencia no encontrado; mensaje inválido.");
